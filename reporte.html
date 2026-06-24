@@ -1,17 +1,17 @@
 services:
   - type: web
     name: verificador-vehicular-peru
-    env: python
-    buildCommand: |
-      pip install -r requirements.txt
-      playwright install chromium
-      playwright install-deps chromium
-    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 300
+    env: docker
+    dockerfilePath: ./Dockerfile
+    plan: starter
+    region: oregon
     envVars:
       - key: HEADLESS
         value: "true"
       - key: TIMEOUT
         value: "30"
+      - key: PORT
+        value: "8000"
       - key: SECRET_KEY
         generateValue: true
       - key: SUNARP_SPRL_USUARIO

@@ -1,0 +1,20 @@
+# ============================================================
+# VEHICLE CHECKER -- Configuracion de credenciales
+# Copia este archivo como .env y completa los valores reales
+# ============================================================
+
+# --- SUNARP SPRL (historial de propietarios) ---
+SUNARP_SPRL_USUARIO=FNEIRACH
+SUNARP_SPRL_CLAVE=APOYO2023$
+
+# --- SAT Trujillo ---
+# Flujo: DNI + Celular + Correo -> CONSULTAR -> Placa -> BUSCAR
+TRUJILLO_DNI=45975202
+TRUJILLO_CELULAR=969762557
+TRUJILLO_CORREO=informesautoescuela@gmail.com
+
+# --- Configuracion general ---
+# Tiempo maximo de espera por pagina (segundos)
+TIMEOUT=30
+# Mostrar el navegador: true=oculto (produccion), false=visible (desarrollo/CAPTCHAs)
+HEADLESS=false
