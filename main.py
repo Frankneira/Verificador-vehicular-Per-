@@ -1,248 +1,186 @@
 """
-main.py -- Orquestador principal del Verificador Vehicular (Fase 1 + Fase 2).
-
-Uso:
-    python main.py B1N553
-    python main.py          (pedira la placa por teclado)
-
-Bloques:
-    Bloque 1 - Documentacion : SUNARP, SOAT, ITV, SPRL, SigueloPlus
-    Bloque 2 - Deudas        : SUTRAN, ATU, SBS, Callao, GNV
-    Bloque 3 - Regionales    : Trujillo, Piura, Chiclayo, Tarapoto,
-                               Cajamarca, Chachapoyas, Huancayo,
-                               Ica, Tacna, Arequipa
+recomendaciones.py -- Motor de recomendaciones finales.
+Analiza los resultados de scraping + checklist y genera un veredicto.
 """
-import asyncio
-import sys
-import os
-import re
-import webbrowser
-
-from playwright.async_api import async_playwright
-
-# Fase 1
-from scrapers import sunarp_vehicular, soat_apeseg, mtc_inspeccion
-from scrapers import sutran, atu, sbs_accidentes
-
-# Fase 2 - SUNARP avanzado
-from scrapers import sunarp_sprl, sunarp_siguelo
-
-# Fase 2 - Deudas adicionales
-from scrapers import callao, gnv_fise
-
-# Fase 2 - Papeletas regionales
-from scrapers import (
-    trujillo, piura, chiclayo, tarapoto,
-    cajamarca, chachapoyas, huancayo,
-    ica, tacna, arequipa
-)
-
-from reporter.generator import generar_reporte
-from config import HEADLESS, TIMEOUT
 
 
-class C:
-    RESET  = "\033[0m"
-    BOLD   = "\033[1m"
-    GREEN  = "\033[92m"
-    YELLOW = "\033[93m"
-    RED    = "\033[91m"
-    BLUE   = "\033[94m"
-    GRAY   = "\033[90m"
-    CYAN   = "\033[96m"
+NIVELES = {
+    "COMPRAR":       {"color": "#276749", "bg": "#f0fff4", "border": "#68d391", "icono": "✅"},
+    "NEGOCIAR":      {"color": "#744210", "bg": "#fffbeb", "border": "#f6ad55", "icono": "⚠️"},
+    "REVISAR_TALLER":{"color": "#744210", "bg": "#fffbeb", "border": "#f6ad55", "icono": "🔧"},
+    "NO_COMPRAR":    {"color": "#742a2a", "bg": "#fff5f5", "border": "#fc8181", "icono": "🚨"},
+}
 
 
-def imprimir_estado(nombre, estado):
-    iconos = {
-        "ok"         : C.GREEN  + "OK          " + C.RESET,
-        "advertencia": C.YELLOW + "ADVERTENCIA " + C.RESET,
-        "error"      : C.RED    + "ERROR       " + C.RESET,
-        "sin_datos"  : C.GRAY   + "SIN DATOS   " + C.RESET,
-    }
-    print("  [{}]  {}".format(iconos.get(estado, "?"), nombre))
+def generar(resultados_scraping, respuestas_checklist=None):
+    """
+    Genera el reporte de recomendaciones.
 
+    Args:
+        resultados_scraping : Lista de ResultadoConsulta de todos los bloques.
+        respuestas_checklist: Dict {id_item: "ok" | "falla" | "no_revisado"}
+                              Si es None, se omite el analisis del checklist.
+    Returns:
+        Dict con veredicto, puntuacion, razones y recomendaciones_lista.
+    """
+    respuestas = respuestas_checklist or {}
 
-def extraer_datos_sprl(r_sprl):
-    """Extrae (anio, numero, sede) del resultado de SUNARP SPRL."""
-    titulo_anio = titulo_numero = sede = ""
-    if r_sprl.estado in ("ok", "advertencia") and r_sprl.datos:
-        titulo_raw = r_sprl.datos.get("Titulo", r_sprl.datos.get("Título", ""))
-        if titulo_raw:
-            partes = re.split(r"[\s\-]+", titulo_raw.strip())
-            if len(partes) >= 2:
-                titulo_anio   = partes[0].strip()
-                titulo_numero = partes[-1].strip()
-        sede = r_sprl.datos.get("Sede", r_sprl.datos.get("sede", "LIMA"))
-    return titulo_anio, titulo_numero, sede
+    puntos_negativos  = 0
+    puntos_positivos  = 0
+    razones_rechazo   = []
+    razones_atencion  = []
+    puntos_favor      = []
+    recomendaciones   = []
 
+    # ── Analisis de resultados de scraping ────────────────────────────────────
+    for r in resultados_scraping:
+        fuente = r.fuente
+        datos  = r.datos or {}
+        msg    = r.mensaje or ""
 
-async def ejecutar_consultas(placa):
-    print("\n" + "=" * 60)
-    print("  VERIFICADOR VEHICULAR -- Placa: {}".format(placa.upper()))
-    print("=" * 60 + "\n")
+        if r.estado == "advertencia":
+            puntos_negativos += 2
 
-    resultados_doc = []
-    resultados_deudas = []
-    resultados_regiones = []
+            # SOAT vencido
+            if "soat" in fuente.lower() and "vencido" in msg.lower():
+                razones_rechazo.append("El SOAT esta VENCIDO. El vehiculo no puede circular legalmente.")
+                recomendaciones.append("Exige al vendedor renovar el SOAT antes de cerrar el trato o descuenta el costo del precio.")
 
-    async with async_playwright() as pw:
-        browser = await pw.chromium.launch(
-            headless=HEADLESS,
-            args=["--start-maximized"]
-        )
-        context = await browser.new_context(
-            viewport={"width": 1280, "height": 800},
-            user_agent=(
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/124.0.0.0 Safari/537.36"
+            # Infracciones SUTRAN
+            elif "sutran" in fuente.lower():
+                total = datos.get("total", "?")
+                razones_atencion.append("El vehiculo tiene {} infraccion(es) en SUTRAN.".format(total))
+                recomendaciones.append("Verifica con el vendedor quien pagara las papeletas SUTRAN pendientes. Descuenta el monto del precio.")
+
+            # Multas ATU
+            elif "atu" in fuente.lower():
+                total = datos.get("total", "?")
+                razones_atencion.append("{} multa(s) pendiente(s) en ATU.".format(total))
+                recomendaciones.append("Solicita al vendedor cancelar las multas ATU antes de la transferencia.")
+
+            # Papeletas regionales
+            elif "papeletas" in fuente.lower():
+                ciudad = datos.get("Ciudad", fuente.replace("Papeletas --", "").strip())
+                total = datos.get("total", "?")
+                razones_atencion.append("Papeleta(s) pendiente(s) en {}: {} multa(s).".format(ciudad, total))
+                recomendaciones.append("Negocia el descuento del valor de las papeletas de {} en el precio final.".format(ciudad))
+
+            # Accidentes SBS
+            elif "sbs" in fuente.lower() or "accidente" in fuente.lower():
+                num = datos.get("Accidentes en ultimos 5 anos", datos.get("Accidentes en últimos 5 años", "?"))
+                razones_atencion.append("El vehiculo registra {} siniestro(s) SOAT en los ultimos 5 anos.".format(num))
+                recomendaciones.append("Solicita el historial tecnico del vehiculo y exige inspeccion en taller de confianza.")
+
+            # SUNARP SPRL -- alerta legal
+            elif "sprl" in fuente.lower():
+                if "embargo" in msg.lower():
+                    razones_rechazo.append("ALERTA: El vehiculo tiene EMBARGO registrado en SUNARP. NO transferible hasta levantar la medida.")
+                    puntos_negativos += 5
+                elif "prescripcion" in msg.lower():
+                    razones_rechazo.append("ALERTA: Se detecta PRESCRIPCION DE DOMINIO en SUNARP. Consulta a un abogado.")
+                    puntos_negativos += 5
+                else:
+                    razones_atencion.append("Hay anotaciones en SUNARP SPRL. Revisa con un abogado antes de firmar.")
+
+            # GNV FISE
+            elif "gnv" in fuente.lower() or "fise" in fuente.lower():
+                razones_atencion.append("El vehiculo tiene deuda de GNV en FISE.")
+                recomendaciones.append("Solicita al vendedor cancelar la deuda GNV antes de la transferencia.")
+
+            # Callao
+            elif "callao" in fuente.lower():
+                razones_atencion.append("Papeleta(s) pendiente(s) en el Callao.")
+                recomendaciones.append("Descuenta el valor de las papeletas del Callao del precio.")
+
+            else:
+                razones_atencion.append("Advertencia en {}: {}".format(fuente, msg[:100]))
+
+        elif r.estado == "ok":
+            puntos_positivos += 1
+            if "soat" in fuente.lower():
+                estado_soat = datos.get("Estado", datos.get("estado", "")).lower()
+                if "vigente" in estado_soat:
+                    puntos_favor.append("SOAT vigente.")
+            elif "inspeccion" in fuente.lower() or "itv" in fuente.lower() or "mtc" in fuente.lower():
+                puntos_favor.append("Inspeccion Tecnica Vehicular al dia.")
+            elif "sutran" in fuente.lower():
+                puntos_favor.append("Sin infracciones en SUTRAN.")
+            elif "atu" in fuente.lower():
+                puntos_favor.append("Sin multas en ATU.")
+            elif "sbs" in fuente.lower():
+                puntos_favor.append("Sin accidentes SOAT registrados.")
+
+        elif r.estado == "error":
+            # Errores de scraping no son fallas del vehiculo -- solo informamos
+            pass
+
+    # ── Analisis del checklist ────────────────────────────────────────────────
+    if respuestas:
+        from inspeccion.checklist import CHECKLIST
+        criticos_fallidos = []
+        items_fallidos    = []
+
+        for item in CHECKLIST:
+            estado_item = respuestas.get(item["id"], "no_revisado")
+            if estado_item == "falla":
+                if item["critico"]:
+                    criticos_fallidos.append(item["item"])
+                    puntos_negativos += 3
+                else:
+                    items_fallidos.append(item["item"])
+                    puntos_negativos += 1
+            elif estado_item == "ok":
+                puntos_positivos += 1
+
+        if criticos_fallidos:
+            razones_rechazo.extend(["FALLA CRITICA: " + i for i in criticos_fallidos])
+            recomendaciones.append(
+                "Los items criticos fallidos son problemas graves. Rechaza el vehiculo o exige reparacion documentada antes de comprar."
             )
-        )
 
-        # --- BLOQUE 1: Documentacion ---
-        print(C.BOLD + "BLOQUE 1 -- Documentacion del vehiculo" + C.RESET)
-        print("-" * 50)
+        if items_fallidos:
+            razones_atencion.extend(items_fallidos)
+            if items_fallidos:
+                recomendaciones.append(
+                    "Cotiza la reparacion de los items con falla y descuenta ese monto del precio negociado."
+                )
 
-        page = await context.new_page()
-        print("  Consultando SUNARP vehicular...")
-        r = await sunarp_vehicular.consultar(page, placa)
-        await page.close()
-        imprimir_estado(r.fuente, r.estado)
-        resultados_doc.append(r)
-        sede_vehiculo = r.datos.get("Sede", "") if r.estado in ("ok", "advertencia") else ""
+    # ── Recomendaciones generales siempre presentes ───────────────────────────
+    recomendaciones.append("Verifica que la placa y VIN del vehiculo coincidan con la Tarjeta de Propiedad (TIVE).")
+    recomendaciones.append("Firma el contrato de compraventa ante notario y realiza la transferencia en SUNARP el mismo dia.")
+    recomendaciones.append("Solicita facturas de mantenimiento o historial de servicio del vehiculo.")
+    recomendaciones.append("Contrata una revision tecnica en taller independiente antes de cerrar el trato (costo: S/ 100 - S/ 200).")
 
-        page = await context.new_page()
-        print("  Consultando SOAT APESEG...")
-        r = await soat_apeseg.consultar(page, placa)
-        await page.close()
-        imprimir_estado(r.fuente, r.estado)
-        resultados_doc.append(r)
-
-        page = await context.new_page()
-        print("  Consultando MTC Inspeccion Tecnica...")
-        r = await mtc_inspeccion.consultar(page, placa)
-        await page.close()
-        imprimir_estado(r.fuente, r.estado)
-        resultados_doc.append(r)
-
-        page = await context.new_page()
-        print("  Consultando SUNARP SPRL (historial propietarios)...")
-        r_sprl = await sunarp_sprl.consultar(page, placa, sede=sede_vehiculo)
-        await page.close()
-        imprimir_estado(r_sprl.fuente, r_sprl.estado)
-        resultados_doc.append(r_sprl)
-
-        titulo_anio, titulo_numero, sede = extraer_datos_sprl(r_sprl)
-        page = await context.new_page()
-        print("  Consultando SUNARP SigueloPlus (monto pagado)...")
-        r = await sunarp_siguelo.consultar(
-            page,
-            titulo_numero=titulo_numero,
-            titulo_anio=titulo_anio,
-            oficina_registral=sede or "LIMA"
-        )
-        await page.close()
-        imprimir_estado(r.fuente, r.estado)
-        resultados_doc.append(r)
-
-        # --- BLOQUE 2: Deudas e Infracciones ---
-        print("\n" + C.BOLD + "BLOQUE 2 -- Deudas e Infracciones" + C.RESET)
-        print("-" * 50)
-
-        for nombre, modulo in [
-            ("SUTRAN infracciones",  sutran),
-            ("ATU multas",           atu),
-            ("SBS accidentes SOAT",  sbs_accidentes),
-            ("Callao papeletas",     callao),
-            ("FISE GNV deuda",       gnv_fise),
-        ]:
-            page = await context.new_page()
-            print("  Consultando {}...".format(nombre))
-            r = await modulo.consultar(page, placa)
-            await page.close()
-            imprimir_estado(r.fuente, r.estado)
-            resultados_deudas.append(r)
-
-        # --- BLOQUE 3: Papeletas Regionales ---
-        print("\n" + C.BOLD + "BLOQUE 3 -- Papeletas Regionales" + C.RESET)
-        print("-" * 50)
-
-        scrapers_regionales = [
-            ("Trujillo",   trujillo),
-            ("Piura",      piura),
-            ("Chiclayo",   chiclayo),
-            ("Tarapoto",   tarapoto),
-            ("Cajamarca",  cajamarca),
-            ("Chachapoyas",chachapoyas),
-            ("Huancayo",   huancayo),
-            ("Ica",        ica),
-            ("Tacna",      tacna),
-            ("Arequipa",   arequipa),
-        ]
-
-        for nombre, modulo in scrapers_regionales:
-            page = await context.new_page()
-            print("  Consultando {}...".format(nombre))
-            r = await modulo.consultar(page, placa)
-            await page.close()
-            imprimir_estado(r.fuente, r.estado)
-            resultados_regiones.append(r)
-
-        await browser.close()
-
-    return resultados_doc, resultados_deudas, resultados_regiones
-
-
-def main():
-    if len(sys.argv) > 1:
-        placa = sys.argv[1].strip().upper()
+    # ── Veredicto final ───────────────────────────────────────────────────────
+    if razones_rechazo:
+        veredicto = "NO_COMPRAR"
+    elif puntos_negativos >= 6:
+        veredicto = "NO_COMPRAR"
+    elif puntos_negativos >= 3:
+        veredicto = "REVISAR_TALLER"
+    elif puntos_negativos >= 1:
+        veredicto = "NEGOCIAR"
     else:
-        placa = input("\n  Ingresa la PLACA del vehiculo a consultar: ").strip().upper()
+        veredicto = "COMPRAR"
 
-    if not placa:
-        print(C.RED + "Error: debes ingresar una placa." + C.RESET)
-        sys.exit(1)
+    nivel = NIVELES[veredicto]
 
-    try:
-        resultados_doc, resultados_deudas, resultados_regiones = asyncio.run(
-            ejecutar_consultas(placa)
-        )
-    except KeyboardInterrupt:
-        print("\n" + C.YELLOW + "Consulta cancelada por el usuario." + C.RESET)
-        sys.exit(0)
-
-    print("\nGenerando reporte HTML...")
-    ruta_reporte = generar_reporte(
-        placa=placa,
-        resultados_doc=resultados_doc,
-        resultados_deudas=resultados_deudas,
-        resultados_regiones=resultados_regiones,
-    )
-    print("  Reporte guardado en: " + ruta_reporte)
-
-    webbrowser.open("file:///" + ruta_reporte.replace(os.sep, "/"))
-
-    todos = resultados_doc + resultados_deudas + resultados_regiones
-    ok          = sum(1 for r in todos if r.estado == "ok")
-    advertencia = sum(1 for r in todos if r.estado == "advertencia")
-    error       = sum(1 for r in todos if r.estado == "error")
-    sin_datos   = sum(1 for r in todos if r.estado == "sin_datos")
-
-    print("\n" + "=" * 60)
-    print("  RESUMEN FINAL -- {}".format(placa))
-    print("=" * 60)
-    print(C.GREEN  + "  Sin problemas  : {}".format(ok)          + C.RESET)
-    print(C.YELLOW + "  Advertencias   : {}".format(advertencia) + C.RESET)
-    print(C.RED    + "  Errores        : {}".format(error)       + C.RESET)
-    print(C.GRAY   + "  Sin datos      : {}".format(sin_datos)   + C.RESET)
-    print(C.CYAN   + "  Total consultas: {}".format(len(todos))  + C.RESET)
-
-    if advertencia > 0:
-        print("\n" + C.YELLOW + "  Hay advertencias -- revisa el reporte antes de comprar." + C.RESET)
-    elif error == 0 and advertencia == 0:
-        print("\n" + C.GREEN + "  Sin problemas detectados." + C.RESET)
-    print("=" * 60 + "\n")
-
-
-if __name__ == "__main__":
-    main()
+    return {
+        "veredicto"         : veredicto,
+        "etiqueta"          : {
+            "COMPRAR"       : "APTO PARA COMPRAR",
+            "NEGOCIAR"      : "NEGOCIAR PRECIO",
+            "REVISAR_TALLER": "REVISAR EN TALLER",
+            "NO_COMPRAR"    : "NO RECOMENDADO",
+        }[veredicto],
+        "color"             : nivel["color"],
+        "bg"                : nivel["bg"],
+        "border"            : nivel["border"],
+        "icono"             : nivel["icono"],
+        "puntos_negativos"  : puntos_negativos,
+        "puntos_positivos"  : puntos_positivos,
+        "razones_rechazo"   : razones_rechazo,
+        "razones_atencion"  : razones_atencion,
+        "puntos_favor"      : puntos_favor,
+        "recomendaciones"   : list(dict.fromkeys(recomendaciones)),  # deduplicar
+    }

@@ -1,8 +1,8 @@
 """
-soat_apeseg.py — Consulta de vigencia del SOAT en APESEG.
-URL: https://www.apeseg.org.pe/consultas-soat/
+sbs_accidentes.py — Consulta de accidentes cubiertos por SOAT en SBS.
+URL: https://servicios.sbs.gob.pe/reportesoat/ReporteCentralRiesgo
 
-Extrae: Estado, Vigente desde, Vigente hasta.
+Extrae: Número de accidentes registrados por pólizas SOAT en los últimos 5 años.
 """
 import asyncio
 from playwright.async_api import Page, TimeoutError as PWTimeout
@@ -12,18 +12,18 @@ from scrapers.base import ResultadoConsulta
 
 async def consultar(page: Page, placa: str) -> ResultadoConsulta:
     resultado = ResultadoConsulta(
-        fuente="APESEG — Consulta SOAT",
-        url=URLS["soat_apeseg"]
+        fuente="SBS — Accidentes Coberturados por SOAT",
+        url=URLS["sbs_accidentes"]
     )
 
     try:
-        await page.goto(URLS["soat_apeseg"], timeout=TIMEOUT, wait_until="domcontentloaded")
-        await asyncio.sleep(2)  # JS inicial
+        await page.goto(URLS["sbs_accidentes"], timeout=TIMEOUT, wait_until="domcontentloaded")
+        await asyncio.sleep(2)
 
-        # Campo placa — APESEG usa un input visible en el formulario de consulta
+        # Campo placa
         campo = page.locator(
-            "input[placeholder*='placa' i], input[name*='placa' i], "
-            "input[id*='placa' i], input[type='text']"
+            "input[id*='plac' i], input[name*='plac' i], "
+            "input[placeholder*='plac' i], input[type='text']"
         )
         await campo.first.wait_for(state="visible", timeout=TIMEOUT)
         await campo.first.fill(placa.upper().strip())
@@ -31,66 +31,61 @@ async def consultar(page: Page, placa: str) -> ResultadoConsulta:
         # Botón consultar
         btn = page.locator(
             "button:has-text('Consultar'), button:has-text('Buscar'), "
-            "button[type='submit'], input[type='submit']"
+            "input[type='submit'], button[type='submit']"
         )
         await btn.first.click()
-        await asyncio.sleep(2)
+        await asyncio.sleep(3)
 
         # Esperar resultado
         await page.wait_for_selector(
-            ".resultado, table, .soat-info, #resultado, .card-body",
+            "table, .resultado, #resultado, p, .alert",
             timeout=TIMEOUT
         )
 
-        # Extraer datos
+        # Extraer el texto completo del resultado
+        contenido = await page.locator("main, #content, .container, body").first.inner_text()
+
+        # Buscar el número de accidentes en el texto
+        import re
         datos = {}
-        campos_mapa = {
-            "Estado"        : ["estado", "vigente", "situacion"],
-            "Vigente desde" : ["vigente desde", "inicio", "fecha inicio", "desde"],
-            "Vigente hasta" : ["vigente hasta", "fin", "fecha fin", "hasta", "vencimiento"],
-            "Compañía"      : ["compañia", "empresa", "aseguradora"],
-        }
 
-        # Buscar en tabla
-        filas = await page.locator("table tr").all()
-        for fila in filas:
-            texto = await fila.inner_text()
-            partes = [p.strip() for p in texto.split("\t") if p.strip()]
-            if len(partes) < 2:
-                partes = [p.strip() for p in texto.split("\n") if p.strip()]
-            if len(partes) >= 2:
-                clave = partes[0].rstrip(":").strip()
-                valor = " ".join(partes[1:]).strip()
-                datos[clave] = valor
-
-        # Buscar por texto si la tabla no dio resultados
-        if not datos:
-            for nombre, variantes in campos_mapa.items():
-                for variante in variantes:
-                    try:
-                        el = page.locator(f"*:has-text('{variante}')").last
-                        if await el.count() > 0:
-                            texto = await el.inner_text()
-                            lineas = [l.strip() for l in texto.split("\n") if l.strip()]
-                            if len(lineas) >= 2:
-                                datos[nombre] = lineas[-1]
-                                break
-                    except Exception:
-                        continue
-
-        # Determinar estado del SOAT
-        estado_soat = datos.get("Estado", datos.get("estado", "")).lower()
-        if "vigente" in estado_soat or "activo" in estado_soat:
-            resultado.marcar_ok(datos)
-        elif "vencido" in estado_soat or "expirado" in estado_soat:
-            resultado.marcar_advertencia(datos, "⚠️ El SOAT está VENCIDO. El vehículo no puede circular legalmente.")
-        elif datos:
-            resultado.marcar_ok(datos)
+        # Patrón: "cuenta con X accidente(s)" o similar
+        patron_accidentes = re.search(
+            r'(\d+)\s*accidente[s]?\s*coberturado[s]?',
+            contenido, re.IGNORECASE
+        )
+        if patron_accidentes:
+            num = int(patron_accidentes.group(1))
+            datos["Accidentes en últimos 5 años"] = str(num)
+            datos["Fuente"] = "Pólizas SOAT"
+            if num == 0:
+                resultado.marcar_ok({**datos, "resumen": "✅ Sin accidentes registrados"})
+            elif num <= 2:
+                resultado.marcar_advertencia(
+                    datos,
+                    f"⚠️ El vehículo tiene {num} accidente(s) registrado(s) en los últimos 5 años."
+                )
+            else:
+                resultado.marcar_advertencia(
+                    datos,
+                    f"🚨 El vehículo tiene {num} accidente(s) — historial alto de siniestros."
+                )
         else:
-            resultado.marcar_sin_datos("No se encontró información del SOAT para esta placa.")
+            # Sin patrón numérico: extraer el párrafo relevante
+            lineas_relevantes = [
+                l.strip() for l in contenido.split("\n")
+                if any(k in l.lower() for k in ["accidente", "cobertura", "soat", "siniestro", "placa"])
+            ]
+            if lineas_relevantes:
+                datos["Resultado"] = " | ".join(lineas_relevantes[:3])
+                resultado.marcar_ok(datos)
+            else:
+                resultado.marcar_sin_datos(
+                    "No se encontró información de accidentes para esta placa."
+                )
 
     except PWTimeout:
-        resultado.marcar_error("Tiempo de espera agotado al consultar APESEG.")
+        resultado.marcar_error("Tiempo de espera agotado al consultar SBS.")
     except Exception as exc:
         resultado.marcar_error(f"Error inesperado: {exc}")
 

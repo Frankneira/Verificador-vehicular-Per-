@@ -1,184 +1,89 @@
 """
-papeleta_base.py — Función genérica para consulta de papeletas municipales.
+mtc_inspeccion.py — Consulta de Inspección Técnica Vehicular en MTC.
+URL: https://rec.mtc.gob.pe/Citv/ArConsultaCitv
 
-La mayoría de municipalidades tienen el mismo patrón:
-  1. Ir a la URL
-  2. Ingresar la placa
-  3. Hacer click en Buscar
-  4. Extraer resultados o confirmar "sin papeletas"
-
-Para casos especiales (login, selector de tipo, campos adicionales),
-cada scraper específico extiende este comportamiento.
+Extrae: Estado de inspección, Fecha inicio, Fecha fin (vigencia).
 """
 import asyncio
 from playwright.async_api import Page, TimeoutError as PWTimeout
-from config import TIMEOUT
+from config import URLS, TIMEOUT
 from scrapers.base import ResultadoConsulta
 
 
-PALABRAS_SIN_DEUDA = [
-    "no registra", "sin multas", "sin papeletas", "no tiene",
-    "no se encontraron", "no hay", "no presenta", "0 resultado",
-    "sin infracciones", "no existe", "not found", "sin deuda",
-]
-
-PALABRAS_CON_DEUDA = [
-    "monto", "deuda", "infracción", "multa", "papeleta",
-    "pendiente", "s/.", "sol", "fecha de infracción",
-]
-
-
-async def consultar_papeleta(
-    page: Page,
-    url: str,
-    ciudad: str,
-    placa: str,
-    *,
-    selector_placa: str = None,
-    selector_buscar: str = None,
-    selector_tipo: str = None,
-    valor_tipo: str = "Placa",
-    campos_extra: dict = None,
-    espera_extra: float = 2.0,
-    selector_resultado: str = None,
-) -> ResultadoConsulta:
-    """
-    Consulta genérica de papeletas por placa.
-
-    Args:
-        page             : Página Playwright.
-        url              : URL del portal municipal.
-        ciudad           : Nombre de la ciudad (para el reporte).
-        placa            : Placa del vehículo.
-        selector_placa   : CSS selector del campo placa (usa heurísticas si None).
-        selector_buscar  : CSS selector del botón buscar (usa heurísticas si None).
-        selector_tipo    : CSS selector del select de tipo de búsqueda (opcional).
-        valor_tipo       : Valor a seleccionar en el select tipo (ej: "Placa").
-        campos_extra     : Dict {selector: valor} para campos adicionales.
-        espera_extra     : Segundos extra de espera después del click.
-        selector_resultado: CSS selector donde aparece el resultado.
-    """
+async def consultar(page: Page, placa: str) -> ResultadoConsulta:
     resultado = ResultadoConsulta(
-        fuente=f"Papeletas — {ciudad}",
-        url=url
-    )
-
-    # Selectores heurísticos por defecto
-    sel_placa = selector_placa or (
-        "input[id*='plac' i], input[name*='plac' i], "
-        "input[placeholder*='plac' i], input[id*='nro_plac' i], "
-        "input[type='text']"
-    )
-    sel_buscar = selector_buscar or (
-        "button:has-text('Buscar'), button:has-text('Consultar'), "
-        "input[type='submit'], button[type='submit'], "
-        "a:has-text('Buscar'), button:has-text('Ver')"
-    )
-    sel_resultado = selector_resultado or (
-        "table, .resultado, #resultado, .alert, .mensaje, "
-        ".infracciones, .papeleta, p, div.content"
+        fuente="MTC — Inspección Técnica Vehicular (ITV)",
+        url=URLS["mtc_inspeccion"]
     )
 
     try:
-        await page.goto(url, timeout=TIMEOUT, wait_until="domcontentloaded")
+        await page.goto(URLS["mtc_inspeccion"], timeout=TIMEOUT, wait_until="domcontentloaded")
         await asyncio.sleep(2)
 
-        # Seleccionar tipo si aplica
-        if selector_tipo:
-            sel = page.locator(selector_tipo)
-            if await sel.count() > 0:
-                try:
-                    await sel.first.select_option(label=valor_tipo)
-                except Exception:
-                    try:
-                        await sel.first.select_option(value=valor_tipo.lower())
-                    except Exception:
-                        pass
-                await asyncio.sleep(0.5)
-
-        # Campos extra (DNI, correo, etc.)
-        if campos_extra:
-            for sel_extra, val_extra in campos_extra.items():
-                campo = page.locator(sel_extra)
-                if await campo.count() > 0:
-                    await campo.first.fill(str(val_extra))
-                    await asyncio.sleep(0.3)
-
-        # Ingresar placa
-        campo = page.locator(sel_placa)
+        # Campo placa
+        campo = page.locator(
+            "input[id*='plac' i], input[name*='plac' i], "
+            "input[placeholder*='plac' i], input[type='text']"
+        )
         await campo.first.wait_for(state="visible", timeout=TIMEOUT)
         await campo.first.fill(placa.upper().strip())
 
-        # Buscar
-        btn = page.locator(sel_buscar)
+        # Botón consultar
+        btn = page.locator(
+            "button:has-text('Consultar'), button:has-text('Buscar'), "
+            "input[type='submit'], button[type='submit']"
+        )
         await btn.first.click()
-        await asyncio.sleep(espera_extra + 1)
+        await asyncio.sleep(3)
 
         # Esperar resultado
-        try:
-            await page.wait_for_selector(sel_resultado, timeout=TIMEOUT)
-        except PWTimeout:
-            pass  # Continuar e intentar extraer de todos modos
+        await page.wait_for_selector(
+            "table, .resultado, #resultado, .grid, .panel-body",
+            timeout=TIMEOUT
+        )
 
-        # Leer texto completo de la página
-        texto = (await page.locator("body").inner_text()).lower()
+        datos = {}
 
-        # Determinar si hay deuda
-        sin_deuda = any(p in texto for p in PALABRAS_SIN_DEUDA)
-        con_deuda = any(p in texto for p in PALABRAS_CON_DEUDA)
-
-        if sin_deuda and not con_deuda:
-            resultado.marcar_ok({
-                "Ciudad": ciudad,
-                "Estado": "Sin papeletas / deudas",
-                "Resumen": "✅ No registra papeletas en esta jurisdicción."
-            })
-            return resultado
-
-        # Intentar extraer tabla de papeletas
-        papeletas = []
-        filas = await page.locator("table tbody tr").all()
-        headers = []
-        ths = await page.locator("table thead th, table tr:first-child th").all()
-        for th in ths:
-            h = (await th.inner_text()).strip()
-            if h:
-                headers.append(h)
-
+        # Extraer de tabla
+        filas = await page.locator("table tr").all()
         for fila in filas:
-            celdas = await fila.locator("td").all()
-            valores = [(await c.inner_text()).strip() for c in celdas]
-            valores = [v for v in valores if v]
-            if valores:
-                if headers and len(headers) == len(valores):
-                    papeletas.append(dict(zip(headers, valores)))
-                else:
-                    papeletas.append({"detalle": " | ".join(valores)})
+            celdas = await fila.locator("td, th").all()
+            textos = [await c.inner_text() for c in celdas]
+            textos = [t.strip() for t in textos if t.strip()]
+            if len(textos) >= 2:
+                datos[textos[0].rstrip(":")] = " ".join(textos[1:])
 
-        if papeletas:
+        # Buscar campos específicos por label
+        if not datos:
+            for label_text in ["Estado", "Inicio", "Fin", "Resultado", "Vigencia"]:
+                try:
+                    el = page.locator(f"label:has-text('{label_text}'), td:has-text('{label_text}')")
+                    if await el.count() > 0:
+                        parent = el.first.locator("..").locator("td, span, input").last
+                        valor = await parent.inner_text()
+                        datos[label_text] = valor.strip()
+                except Exception:
+                    continue
+
+        # Determinar estado de ITV
+        estado = datos.get("Estado", datos.get("Resultado", "")).lower()
+        if "aprobado" in estado or "vigente" in estado or "favorable" in estado:
+            resultado.marcar_ok(datos)
+        elif "desaprobado" in estado or "vencido" in estado or "rechazado" in estado:
             resultado.marcar_advertencia(
-                {"Ciudad": ciudad, "papeletas": papeletas, "total": len(papeletas)},
-                f"⚠️ Se encontraron {len(papeletas)} papeleta(s) en {ciudad}."
+                datos,
+                "⚠️ La Inspección Técnica Vehicular está VENCIDA o DESAPROBADA."
             )
-        elif con_deuda:
-            # Hay indicios de deuda pero no tabla estructurada
-            lineas_deuda = [
-                l.strip() for l in (await page.locator("body").inner_text()).split("\n")
-                if any(p in l.lower() for p in PALABRAS_CON_DEUDA) and l.strip()
-            ]
-            resultado.marcar_advertencia(
-                {"Ciudad": ciudad, "detalle": " | ".join(lineas_deuda[:5])},
-                f"⚠️ Se detectó posible deuda en {ciudad}. Verifica manualmente."
-            )
+        elif datos:
+            resultado.marcar_ok(datos)
         else:
             resultado.marcar_sin_datos(
-                f"No se pudo determinar el estado de papeletas en {ciudad}. "
-                f"Verifica el portal directamente: {url}"
+                "No se encontró registro de Inspección Técnica para esta placa."
             )
 
     except PWTimeout:
-        resultado.marcar_error(f"Tiempo de espera agotado al consultar {ciudad}.")
+        resultado.marcar_error("Tiempo de espera agotado al consultar MTC.")
     except Exception as exc:
-        resultado.marcar_error(f"Error consultando {ciudad}: {exc}")
+        resultado.marcar_error(f"Error inesperado: {exc}")
 
     return resultado

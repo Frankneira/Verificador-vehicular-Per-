@@ -1,397 +1,56 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Verificando {{ placa }} — Verificador Vehicular Perú</title>
-  <style>
-    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-    :root{
-      --azul:#1a365d;--azul2:#2b6cb0;--azul3:#ebf4ff;
-      --verde:#276749;--verde2:#f0fff4;--verde3:#68d391;
-      --amarillo:#744210;--amarillo2:#fffbeb;--amarillo3:#f6ad55;
-      --rojo:#742a2a;--rojo2:#fff5f5;--rojo3:#fc8181;
-      --gris:#4a5568;--gris2:#718096;--gris3:#e2e8f0;--gris4:#f7fafc;
+"""
+generator.py -- Genera el reporte HTML a partir de los resultados.
+"""
+import os
+from datetime import datetime
+from pathlib import Path
+from typing import List
+from jinja2 import Environment, FileSystemLoader
+from scrapers.base import ResultadoConsulta
+
+TEMPLATES_DIR = Path(__file__).parent / "templates"
+
+
+def generar_reporte(
+    placa,
+    resultados_doc,
+    resultados_deudas,
+    resultados_regiones=None,
+    ruta_salida=None
+):
+    resultados_regiones = resultados_regiones or []
+
+    env = Environment(loader=FileSystemLoader(str(TEMPLATES_DIR)))
+    template = env.get_template("reporte.html")
+
+    todos = resultados_doc + resultados_deudas + resultados_regiones
+    conteo = {
+        "ok"         : sum(1 for r in todos if r.estado == "ok"),
+        "advertencia": sum(1 for r in todos if r.estado == "advertencia"),
+        "error"      : sum(1 for r in todos if r.estado == "error"),
+        "sin_datos"  : sum(1 for r in todos if r.estado == "sin_datos"),
+        "total"      : len(todos),
     }
-    body{font-family:'Segoe UI',Arial,sans-serif;background:var(--gris4);color:#1a202c;min-height:100vh}
 
-    /* ── HEADER ── */
-    header{background:linear-gradient(135deg,var(--azul),var(--azul2));color:white;padding:18px 28px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
-    header h1{font-size:17px;font-weight:700}
-    .placa-badge{background:rgba(255,255,255,0.15);border:2px solid rgba(255,255,255,0.35);border-radius:8px;padding:6px 18px;font-size:22px;font-weight:900;letter-spacing:4px}
+    html = template.render(
+        placa=placa.upper(),
+        fecha=datetime.now().strftime("%d/%m/%Y %H:%M"),
+        resultados_doc=resultados_doc,
+        resultados_deudas=resultados_deudas,
+        resultados_regiones=resultados_regiones,
+        conteo=conteo,
+    )
 
-    /* ── LAYOUT ── */
-    main{max-width:900px;margin:28px auto;padding:0 16px 80px}
+    if not ruta_salida:
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        ruta_salida = os.path.join(
+            os.path.dirname(__file__), "..", "reportes",
+            "reporte_{}_{}.html".format(placa.upper(), ts)
+        )
 
-    /* ── PROGRESS ── */
-    .progress-card{background:white;border-radius:14px;padding:28px 28px 24px;box-shadow:0 2px 12px rgba(0,0,0,0.07);margin-bottom:24px}
-    .progress-card h2{font-size:16px;font-weight:700;color:var(--azul);margin-bottom:16px}
-    .progress-bar-wrap{background:var(--gris3);border-radius:10px;height:12px;overflow:hidden;margin-bottom:10px}
-    .progress-bar{height:100%;border-radius:10px;background:linear-gradient(90deg,var(--azul2),#3182ce);width:0%;transition:width .4s ease}
-    .progress-info{display:flex;justify-content:space-between;font-size:12px;color:var(--gris2)}
-    .paso-actual{margin-top:12px;font-size:13px;color:var(--gris);font-weight:500;min-height:20px}
-    .spinner{display:inline-block;width:12px;height:12px;border:2px solid var(--azul3);border-top-color:var(--azul2);border-radius:50%;animation:spin .7s linear infinite;margin-right:6px}
-    @keyframes spin{to{transform:rotate(360deg)}}
+    os.makedirs(os.path.dirname(ruta_salida), exist_ok=True)
 
-    /* ── RESULTADOS EN TIEMPO REAL ── */
-    .bloques{display:grid;gap:20px}
-    .bloque-card{background:white;border-radius:14px;padding:20px 22px;box-shadow:0 2px 12px rgba(0,0,0,0.06)}
-    .bloque-titulo{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--gris2);border-bottom:2px solid var(--gris3);padding-bottom:8px;margin-bottom:14px}
-    .resultados-lista{display:flex;flex-direction:column;gap:8px}
-    .resultado-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;font-size:13px;animation:fadeIn .3s ease}
-    @keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
-    .resultado-item.ok{background:var(--verde2);color:var(--verde);border:1px solid #c6f6d5}
-    .resultado-item.advertencia{background:var(--amarillo2);color:var(--amarillo);border:1px solid #fbd38d}
-    .resultado-item.error{background:var(--rojo2);color:var(--rojo);border:1px solid #fed7d7}
-    .resultado-item.sin_datos{background:var(--gris4);color:var(--gris);border:1px solid var(--gris3)}
-    .resultado-item.pendiente{background:#f0f4f8;color:#a0aec0;border:1px solid #e2e8f0}
-    .result-fuente{font-weight:600;flex:1}
-    .result-msg{font-size:11px;opacity:.8}
-    .result-badge{font-size:10px;font-weight:700;white-space:nowrap}
+    with open(ruta_salida, "w", encoding="utf-8") as f:
+        f.write(html)
 
-    /* ── RESUMEN FINAL ── */
-    .resumen-final{background:white;border-radius:14px;padding:24px 28px;box-shadow:0 4px 20px rgba(0,0,0,0.09);margin-top:24px;display:none}
-    .resumen-final h2{font-size:18px;font-weight:800;color:var(--azul);margin-bottom:20px}
-    .contadores{display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:12px;margin-bottom:24px}
-    .contador{text-align:center;padding:16px 10px;border-radius:10px}
-    .contador .num{font-size:32px;font-weight:800;line-height:1}
-    .contador .lbl{font-size:10px;text-transform:uppercase;letter-spacing:.5px;margin-top:4px;opacity:.8}
-    .c-ok{background:var(--verde2);color:var(--verde)}
-    .c-warn{background:var(--amarillo2);color:var(--amarillo)}
-    .c-err{background:var(--rojo2);color:var(--rojo)}
-    .c-nd{background:var(--gris4);color:var(--gris)}
-    .btn-row{display:flex;gap:12px;flex-wrap:wrap}
-    .btn{padding:12px 22px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;border:none;text-decoration:none;display:inline-flex;align-items:center;gap:8px;transition:opacity .2s}
-    .btn:hover{opacity:.88}
-    .btn-primary{background:var(--azul2);color:white}
-    .btn-secondary{background:var(--gris3);color:var(--gris)}
-
-    /* ── CHECKLIST ── */
-    #seccion-checklist{display:none;margin-top:28px}
-    .checklist-card{background:white;border-radius:14px;padding:24px 28px;box-shadow:0 2px 12px rgba(0,0,0,0.06);margin-bottom:20px}
-    .checklist-card h2{font-size:17px;font-weight:800;color:var(--azul);margin-bottom:6px}
-    .checklist-card .subtitulo{font-size:13px;color:var(--gris2);margin-bottom:22px;line-height:1.5}
-    .cat-titulo{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--azul2);border-bottom:2px solid var(--azul3);padding-bottom:6px;margin:20px 0 14px}
-    .cat-titulo:first-of-type{margin-top:0}
-    .check-item{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:start;padding:12px 14px;border-radius:8px;border:1px solid var(--gris3);margin-bottom:8px;transition:border-color .2s}
-    .check-item.critico{border-left:4px solid var(--rojo3)}
-    .check-item:hover{border-color:#a0aec0}
-    .check-nombre{font-size:13px;font-weight:600;color:#2d3748;margin-bottom:3px}
-    .check-detalle{font-size:11px;color:var(--gris2);line-height:1.4}
-    .check-critico-badge{font-size:10px;background:var(--rojo2);color:var(--rojo);padding:2px 6px;border-radius:4px;font-weight:700;white-space:nowrap;margin-top:3px;display:inline-block}
-    .check-opciones{display:flex;flex-direction:column;gap:4px;min-width:110px}
-    .radio-btn{display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;padding:4px 8px;border-radius:6px;border:1px solid var(--gris3);transition:all .2s}
-    .radio-btn:has(input:checked).ok-radio{background:var(--verde2);border-color:var(--verde3);color:var(--verde)}
-    .radio-btn:has(input:checked).fail-radio{background:var(--rojo2);border-color:var(--rojo3);color:var(--rojo)}
-    .radio-btn:has(input:checked).nd-radio{background:var(--gris4);border-color:#a0aec0;color:var(--gris)}
-    .radio-btn input{display:none}
-    .btn-generar{width:100%;padding:16px;background:linear-gradient(135deg,var(--azul),var(--azul2));color:white;border:none;border-radius:10px;font-size:16px;font-weight:800;cursor:pointer;margin-top:20px;transition:opacity .2s}
-    .btn-generar:hover{opacity:.9}
-
-    /* ── RECOMENDACIONES ── */
-    #seccion-recomendaciones{display:none;margin-top:28px}
-    .veredicto-card{border-radius:16px;padding:28px 32px;margin-bottom:20px;border:2px solid}
-    .veredicto-icono{font-size:40px;margin-bottom:12px;display:block}
-    .veredicto-titulo{font-size:24px;font-weight:900;margin-bottom:10px}
-    .veredicto-sub{font-size:14px;opacity:.85}
-    .rec-section{background:white;border-radius:14px;padding:22px 26px;box-shadow:0 2px 12px rgba(0,0,0,0.06);margin-bottom:16px}
-    .rec-section h3{font-size:14px;font-weight:700;margin-bottom:14px}
-    .rec-list{list-style:none;display:flex;flex-direction:column;gap:8px}
-    .rec-list li{display:flex;gap:10px;align-items:flex-start;font-size:13px;line-height:1.5}
-    .rec-list li::before{content:'→';font-weight:700;min-width:16px}
-    .rec-list.rechazo li::before{content:'🚨';color:var(--rojo)}
-    .rec-list.atencion li::before{content:'⚠️'}
-    .rec-list.favor li::before{content:'✅'}
-    .rec-list.recs li::before{content:'💡';color:#d69e2e}
-    .btn-pdf{padding:13px 24px;background:#276749;color:white;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer}
-    .btn-pdf:hover{background:#22543d}
-
-    @media(max-width:640px){
-      .check-item{grid-template-columns:1fr;gap:8px}
-      .check-opciones{flex-direction:row;flex-wrap:wrap}
-    }
-    @media print{
-      .no-print{display:none!important}
-      header{print-color-adjust:exact;-webkit-print-color-adjust:exact}
-    }
-  </style>
-</head>
-<body>
-
-<header>
-  <h1>🚗 Verificador Vehicular Perú</h1>
-  <div class="placa-badge">{{ placa }}</div>
-</header>
-
-<main>
-
-  <!-- ── PROGRESO ── -->
-  <div class="progress-card">
-    <h2>Consultando fuentes oficiales...</h2>
-    <div class="progress-bar-wrap">
-      <div class="progress-bar" id="progBar"></div>
-    </div>
-    <div class="progress-info">
-      <span id="pasoLabel">Iniciando...</span>
-      <span id="pctLabel">0%</span>
-    </div>
-    <div class="paso-actual" id="pasoActual">
-      <span class="spinner"></span> Conectando con los portales del Estado peruano...
-    </div>
-  </div>
-
-  <!-- ── RESULTADOS EN TIEMPO REAL ── -->
-  <div class="bloques">
-    <div class="bloque-card">
-      <div class="bloque-titulo">📋 Bloque 1 — Documentación del Vehículo</div>
-      <div class="resultados-lista" id="lista-b1"></div>
-    </div>
-    <div class="bloque-card">
-      <div class="bloque-titulo">🚦 Bloque 2 — Deudas e Infracciones</div>
-      <div class="resultados-lista" id="lista-b2"></div>
-    </div>
-    <div class="bloque-card">
-      <div class="bloque-titulo">📍 Bloque 3 — Papeletas Regionales</div>
-      <div class="resultados-lista" id="lista-b3"></div>
-    </div>
-  </div>
-
-  <!-- ── RESUMEN FINAL ── -->
-  <div class="resumen-final" id="resumenFinal">
-    <h2>✅ Consulta completada</h2>
-    <div class="contadores">
-      <div class="contador c-ok"><div class="num" id="cnt-ok">0</div><div class="lbl">✅ Sin problemas</div></div>
-      <div class="contador c-warn"><div class="num" id="cnt-warn">0</div><div class="lbl">⚠️ Advertencias</div></div>
-      <div class="contador c-err"><div class="num" id="cnt-err">0</div><div class="lbl">🚨 Errores</div></div>
-      <div class="contador c-nd"><div class="num" id="cnt-nd">0</div><div class="lbl">ℹ️ Sin datos</div></div>
-    </div>
-    <div class="btn-row">
-      <button class="btn btn-primary" onclick="mostrarChecklist()">🔧 Completar Inspección Técnica</button>
-      <a class="btn btn-secondary" href="/reporte/{{ sid }}" target="_blank">📄 Ver Reporte Completo</a>
-    </div>
-  </div>
-
-  <!-- ── CHECKLIST ── -->
-  <div id="seccion-checklist">
-    <div class="checklist-card">
-      <h2>🔧 Inspección Visual y Técnica</h2>
-      <p class="subtitulo">
-        Completa este checklist mientras inspeccionas físicamente el vehículo.
-        Los ítems marcados con <strong style="color:var(--rojo)">CRÍTICO</strong> son motivo de rechazo inmediato si fallan.
-        Marca "N/R" si no puedes revisar ese punto.
-      </p>
-
-      <form id="formChecklist">
-        {% for cat in categorias %}
-        <div class="cat-titulo">
-          {% if cat == 'exterior' %}🚗 Exterior y Carrocería
-          {% elif cat == 'interior' %}🪑 Interior y Electrónica
-          {% elif cat == 'motor' %}🔧 Motor y Compartimiento
-          {% elif cat == 'chasis' %}⚙️ Chasis y Parte Inferior
-          {% elif cat == 'prueba_manejo' %}🏁 Prueba de Manejo
-          {% endif %}
-        </div>
-
-        {% for item in checklist %}
-        {% if item.categoria == cat %}
-        <div class="check-item {% if item.critico %}critico{% endif %}">
-          <div style="padding-top:2px">
-            <div style="font-size:12px;color:var(--gris2);font-weight:700">{{ item.id }}</div>
-          </div>
-          <div>
-            <div class="check-nombre">{{ item.item }}</div>
-            <div class="check-detalle">{{ item.detalle }}</div>
-            {% if item.critico %}<span class="check-critico-badge">⚠️ CRÍTICO</span>{% endif %}
-          </div>
-          <div class="check-opciones">
-            <label class="radio-btn ok-radio">
-              <input type="radio" name="{{ item.id }}" value="ok"> ✅ OK
-            </label>
-            <label class="radio-btn fail-radio">
-              <input type="radio" name="{{ item.id }}" value="falla"> ❌ Falla
-            </label>
-            <label class="radio-btn nd-radio">
-              <input type="radio" name="{{ item.id }}" value="no_revisado" checked> — N/R
-            </label>
-          </div>
-        </div>
-        {% endif %}
-        {% endfor %}
-        {% endfor %}
-
-        <button type="button" class="btn-generar" onclick="generarRecomendaciones()">
-          ✅ Generar Veredicto y Recomendaciones
-        </button>
-      </form>
-    </div>
-  </div>
-
-  <!-- ── RECOMENDACIONES ── -->
-  <div id="seccion-recomendaciones">
-    <div class="veredicto-card" id="veredictoCard">
-      <span class="veredicto-icono" id="veredictoIcono"></span>
-      <div class="veredicto-titulo" id="veredictoTitulo"></div>
-      <div class="veredicto-sub" id="veredictoSub"></div>
-    </div>
-
-    <div class="rec-section" id="secRechazo" style="display:none">
-      <h3 style="color:var(--rojo)">🚨 Razones para NO comprar</h3>
-      <ul class="rec-list rechazo" id="listaRechazo"></ul>
-    </div>
-
-    <div class="rec-section" id="secAtencion" style="display:none">
-      <h3 style="color:var(--amarillo)">⚠️ Puntos a atender o negociar</h3>
-      <ul class="rec-list atencion" id="listaAtencion"></ul>
-    </div>
-
-    <div class="rec-section" id="secFavor" style="display:none">
-      <h3 style="color:var(--verde)">✅ Puntos a favor</h3>
-      <ul class="rec-list favor" id="listaFavor"></ul>
-    </div>
-
-    <div class="rec-section">
-      <h3 style="color:#d69e2e">💡 Recomendaciones de acción</h3>
-      <ul class="rec-list recs" id="listaRecs"></ul>
-    </div>
-
-    <div class="btn-row no-print" style="margin-top:16px">
-      <button class="btn-pdf" onclick="window.print()">🖨️ Exportar PDF</button>
-      <a class="btn btn-secondary" href="/reporte/{{ sid }}" target="_blank">📄 Reporte completo</a>
-      <a class="btn btn-secondary" href="/">🔄 Nueva consulta</a>
-    </div>
-  </div>
-
-</main>
-
-<script>
-const SID = "{{ sid }}";
-const PLACA = "{{ placa }}";
-const iconos = {ok:"✅",advertencia:"⚠️",error:"🚨",sin_datos:"ℹ️"};
-const labels = {ok:"OK",advertencia:"ADVERTENCIA",error:"ERROR",sin_datos:"SIN DATOS"};
-let escaneoTerminado = false;
-
-// ── SSE ────────────────────────────────────────────────────────────────────────
-const es = new EventSource("/api/stream/" + SID);
-
-es.onmessage = function(e) {
-  const ev = JSON.parse(e.data);
-
-  if (ev.tipo === "progreso") {
-    document.getElementById("progBar").style.width = ev.pct + "%";
-    document.getElementById("pctLabel").textContent = ev.pct + "%";
-    document.getElementById("pasoLabel").textContent = "Paso " + ev.paso + " de " + ev.total;
-    document.getElementById("pasoActual").innerHTML =
-      '<span class="spinner"></span> Consultando: <strong>' + ev.nombre + '</strong>';
-  }
-
-  else if (ev.tipo === "resultado") {
-    const r  = ev.resultado;
-    const el = document.createElement("div");
-    el.className = "resultado-item " + r.estado;
-    const msg = r.mensaje ? '<span class="result-msg"> — ' + r.mensaje.substring(0,80) + '</span>' : '';
-    el.innerHTML =
-      '<span>' + iconos[r.estado] + '</span>' +
-      '<span class="result-fuente">' + r.fuente + msg + '</span>' +
-      '<span class="result-badge">' + labels[r.estado] + '</span>';
-    document.getElementById("lista-b" + ev.bloque).appendChild(el);
-  }
-
-  else if (ev.tipo === "listo") {
-    document.getElementById("progBar").style.width = "100%";
-    document.getElementById("pctLabel").textContent = "100%";
-    document.getElementById("pasoActual").textContent = "✅ Consulta completada.";
-    document.getElementById("cnt-ok").textContent   = ev.ok;
-    document.getElementById("cnt-warn").textContent = ev.warn;
-    document.getElementById("cnt-err").textContent  = ev.errors;
-    document.getElementById("cnt-nd").textContent   = ev.total - ev.ok - ev.warn - ev.errors;
-    document.getElementById("resumenFinal").style.display = "block";
-    escaneoTerminado = true;
-    es.close();
-  }
-
-  else if (ev.tipo === "error_fatal") {
-    document.getElementById("pasoActual").innerHTML =
-      '<span style="color:var(--rojo)">🚨 Error: ' + ev.mensaje + '</span>';
-    es.close();
-  }
-
-  else if (ev.tipo === "fin") {
-    es.close();
-  }
-};
-
-es.onerror = function() {
-  if (!escaneoTerminado) {
-    document.getElementById("pasoActual").innerHTML =
-      '<span style="color:var(--rojo)">⚠️ Conexión interrumpida. Recarga la página para reintentar.</span>';
-  }
-  es.close();
-};
-
-// ── Mostrar checklist ─────────────────────────────────────────────────────────
-function mostrarChecklist() {
-  document.getElementById("seccion-checklist").style.display = "block";
-  document.getElementById("seccion-checklist").scrollIntoView({behavior:"smooth"});
-}
-
-// ── Generar recomendaciones ───────────────────────────────────────────────────
-async function generarRecomendaciones() {
-  const form  = document.getElementById("formChecklist");
-  const rads  = form.querySelectorAll("input[type='radio']:checked");
-  const resp  = {};
-  rads.forEach(r => { resp[r.name] = r.value; });
-
-  const res = await fetch("/api/recomendaciones", {
-    method : "POST",
-    headers: {"Content-Type":"application/json"},
-    body   : JSON.stringify({sid: SID, respuestas: resp}),
-  });
-  const data = await res.json();
-  mostrarVeredicto(data);
-}
-
-function mostrarVeredicto(d) {
-  // Card veredicto
-  const card = document.getElementById("veredictoCard");
-  card.style.background = d.bg;
-  card.style.borderColor = d.border;
-  card.style.color = d.color;
-  document.getElementById("veredictoIcono").textContent  = d.icono;
-  document.getElementById("veredictoTitulo").textContent = d.etiqueta;
-  document.getElementById("veredictoSub").textContent =
-    "Puntuación: " + d.puntos_negativos + " puntos negativos / " + d.puntos_positivos + " positivos";
-
-  // Razones rechazo
-  if (d.razones_rechazo && d.razones_rechazo.length) {
-    llenarLista("listaRechazo", d.razones_rechazo);
-    document.getElementById("secRechazo").style.display = "block";
-  }
-  // Razones atención
-  if (d.razones_atencion && d.razones_atencion.length) {
-    llenarLista("listaAtencion", d.razones_atencion);
-    document.getElementById("secAtencion").style.display = "block";
-  }
-  // Puntos favor
-  if (d.puntos_favor && d.puntos_favor.length) {
-    llenarLista("listaFavor", d.puntos_favor);
-    document.getElementById("secFavor").style.display = "block";
-  }
-  // Recomendaciones
-  llenarLista("listaRecs", d.recomendaciones);
-
-  document.getElementById("seccion-recomendaciones").style.display = "block";
-  document.getElementById("seccion-recomendaciones").scrollIntoView({behavior:"smooth"});
-}
-
-function llenarLista(id, items) {
-  const ul = document.getElementById(id);
-  ul.innerHTML = "";
-  items.forEach(txt => {
-    const li = document.createElement("li");
-    li.textContent = txt;
-    ul.appendChild(li);
-  });
-}
-</script>
-</body>
-</html>
+    return os.path.abspath(ruta_salida)

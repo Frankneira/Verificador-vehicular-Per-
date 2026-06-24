@@ -1,29 +1,18 @@
 """
-callao.py — Papeletas Municipalidad del Callao.
-URL: https://pagopapeletascallao.pe/
-
-El portal del Callao puede requerir un código de seguridad (captcha visual).
-Se ejecuta en modo visible para que el usuario lo resuelva manualmente.
+cajamarca.py — Papeletas SAT Cajamarca.
+URL: https://www.satcajamarca.gob.pe/#/
+El portal usa Angular (SPA) — requiere más tiempo de carga.
 """
-import asyncio
-from playwright.async_api import Page, TimeoutError as PWTimeout
-from config import URLS, TIMEOUT
+from playwright.async_api import Page
+from config import URLS
 from scrapers.papeleta_base import consultar_papeleta
-
 
 async def consultar(page: Page, placa: str):
     return await consultar_papeleta(
-        page=page,
-        url=URLS["callao"],
-        ciudad="Callao",
-        placa=placa,
+        page=page, url=URLS["cajamarca"], ciudad="Cajamarca (SAT)", placa=placa,
         selector_placa=(
-            "input[id*='plac' i], input[name*='plac' i], "
-            "input[placeholder*='plac' i], input[type='text']"
+            "input[placeholder*='plac' i], input[id*='plac' i], "
+            "input[ng-model*='plac' i], input[type='text']"
         ),
-        selector_buscar=(
-            "button:has-text('Consultar'), button:has-text('Buscar'), "
-            "input[type='submit'], button[type='submit']"
-        ),
-        espera_extra=3.0,  # El Callao tarda un poco más
+        espera_extra=4.0,  # Angular SPA necesita más tiempo
     )

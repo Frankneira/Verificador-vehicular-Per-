@@ -1,273 +1,248 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Verificador Vehicular Peru</title>
-  <style>
-    :root{
-      --azul:#1a365d;--azul2:#2b6cb0;--azul3:#ebf8ff;
-      --verde:#276749;--verde2:#c6f6d5;
-      --rojo:#c53030;--rojo2:#fed7d7;
-      --amarillo:#744210;--amarillo2:#fefcbf;
-      --gris:#4a5568;--gris2:#718096;--gris3:#e2e8f0;
-      --blanco:#ffffff;
+"""
+main.py -- Orquestador principal del Verificador Vehicular (Fase 1 + Fase 2).
+
+Uso:
+    python main.py B1N553
+    python main.py          (pedira la placa por teclado)
+
+Bloques:
+    Bloque 1 - Documentacion : SUNARP, SOAT, ITV, SPRL, SigueloPlus
+    Bloque 2 - Deudas        : SUTRAN, ATU, SBS, Callao, GNV
+    Bloque 3 - Regionales    : Trujillo, Piura, Chiclayo, Tarapoto,
+                               Cajamarca, Chachapoyas, Huancayo,
+                               Ica, Tacna, Arequipa
+"""
+import asyncio
+import sys
+import os
+import re
+import webbrowser
+
+from playwright.async_api import async_playwright
+
+# Fase 1
+from scrapers import sunarp_vehicular, soat_apeseg, mtc_inspeccion
+from scrapers import sutran, atu, sbs_accidentes
+
+# Fase 2 - SUNARP avanzado
+from scrapers import sunarp_sprl, sunarp_siguelo
+
+# Fase 2 - Deudas adicionales
+from scrapers import callao, gnv_fise
+
+# Fase 2 - Papeletas regionales
+from scrapers import (
+    trujillo, piura, chiclayo, tarapoto,
+    cajamarca, chachapoyas, huancayo,
+    ica, tacna, arequipa
+)
+
+from reporter.generator import generar_reporte
+from config import HEADLESS, TIMEOUT
+
+
+class C:
+    RESET  = "\033[0m"
+    BOLD   = "\033[1m"
+    GREEN  = "\033[92m"
+    YELLOW = "\033[93m"
+    RED    = "\033[91m"
+    BLUE   = "\033[94m"
+    GRAY   = "\033[90m"
+    CYAN   = "\033[96m"
+
+
+def imprimir_estado(nombre, estado):
+    iconos = {
+        "ok"         : C.GREEN  + "OK          " + C.RESET,
+        "advertencia": C.YELLOW + "ADVERTENCIA " + C.RESET,
+        "error"      : C.RED    + "ERROR       " + C.RESET,
+        "sin_datos"  : C.GRAY   + "SIN DATOS   " + C.RESET,
     }
-    *{margin:0;padding:0;box-sizing:border-box}
-    body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:#f7fafc;color:#2d3748}
-    .hero{background:linear-gradient(135deg,var(--azul) 0%,var(--azul2) 100%);padding:60px 20px 80px;text-align:center;color:white}
-    .hero-icon{font-size:64px;display:block;margin-bottom:16px}
-    .hero h1{font-size:clamp(24px,5vw,42px);font-weight:900;letter-spacing:-0.5px;margin-bottom:12px}
-    .hero p{font-size:clamp(14px,2.5vw,18px);opacity:.9;max-width:640px;margin:0 auto 36px;line-height:1.6}
-    .form-card{background:white;border-radius:20px;padding:32px 28px;max-width:520px;margin:0 auto;box-shadow:0 20px 60px rgba(0,0,0,0.15)}
-    .form-label{display:block;font-size:13px;font-weight:700;color:var(--azul);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px}
-    .form-input-wrap{display:flex;gap:10px;margin-bottom:8px}
-    .form-input{flex:1;padding:14px 18px;border:2px solid var(--gris3);border-radius:12px;font-size:17px;font-weight:700;letter-spacing:2px;text-transform:uppercase;outline:none;transition:border-color .2s}
-    .form-input:focus{border-color:var(--azul2)}
-    .btn-verificar{padding:14px 22px;background:linear-gradient(135deg,var(--azul),var(--azul2));color:white;border:none;border-radius:12px;font-size:15px;font-weight:800;cursor:pointer;white-space:nowrap;transition:opacity .2s}
-    .btn-verificar:hover{opacity:.9}
-    .form-hint{font-size:11px;color:var(--gris2);text-align:center;margin-top:4px}
-    .error-msg{background:var(--rojo2);color:var(--rojo);border:1px solid #fc8181;border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:14px;font-weight:600}
+    print("  [{}]  {}".format(iconos.get(estado, "?"), nombre))
 
-    /* ── TABS ── */
-    .tabs{display:flex;gap:0;margin-bottom:20px;border-radius:10px;overflow:hidden;border:2px solid var(--gris3)}
-    .tab{flex:1;padding:11px 10px;text-align:center;font-size:13px;font-weight:700;cursor:pointer;background:var(--gris3);color:var(--gris);border:none;transition:all .2s}
-    .tab.activo{background:var(--azul2);color:white}
-    .panel{display:none}
-    .panel.activo{display:block}
 
-    /* ── Zona de carga masiva ── */
-    .drop-zone{border:2px dashed rgba(43,108,176,0.4);border-radius:12px;padding:30px 20px;text-align:center;cursor:pointer;transition:all .2s;margin-bottom:14px;background:var(--azul3)}
-    .drop-zone:hover,.drop-zone.drag-over{border-color:var(--azul2);background:#dbeafe}
-    .drop-icon{font-size:36px;display:block;margin-bottom:8px}
-    .drop-label{font-size:14px;font-weight:600;color:var(--azul);margin-bottom:4px}
-    .drop-hint{font-size:11px;color:var(--gris2)}
-    #inputArchivo{display:none}
-    .placas-detectadas{display:none;margin-top:14px}
-    .placas-titulo{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--gris2);margin-bottom:8px}
-    .placas-grid{display:flex;flex-wrap:wrap;gap:7px;max-height:160px;overflow-y:auto;margin-bottom:14px}
-    .placa-tag{background:var(--azul3);color:var(--azul2);border:1px solid #bee3f8;border-radius:6px;padding:4px 10px;font-size:13px;font-weight:700;letter-spacing:1.5px;display:flex;align-items:center;gap:5px}
-    .placa-tag .remove{cursor:pointer;color:#a0aec0;font-size:15px;line-height:1}
-    .placa-tag .remove:hover{color:var(--rojo)}
-    .btn-iniciar{width:100%;padding:13px;background:linear-gradient(135deg,var(--azul),var(--azul2));color:white;border:none;border-radius:10px;font-size:15px;font-weight:800;cursor:pointer;transition:opacity .2s}
-    .btn-iniciar:hover{opacity:.9}
-    .btn-iniciar:disabled{opacity:.5;cursor:not-allowed}
-    .cargando-msg{font-size:12px;color:var(--gris2);text-align:center;margin-top:8px;min-height:16px}
-    .limite-msg{font-size:11px;color:var(--gris2);margin-top:6px;text-align:right}
+def extraer_datos_sprl(r_sprl):
+    """Extrae (anio, numero, sede) del resultado de SUNARP SPRL."""
+    titulo_anio = titulo_numero = sede = ""
+    if r_sprl.estado in ("ok", "advertencia") and r_sprl.datos:
+        titulo_raw = r_sprl.datos.get("Titulo", r_sprl.datos.get("Título", ""))
+        if titulo_raw:
+            partes = re.split(r"[\s\-]+", titulo_raw.strip())
+            if len(partes) >= 2:
+                titulo_anio   = partes[0].strip()
+                titulo_numero = partes[-1].strip()
+        sede = r_sprl.datos.get("Sede", r_sprl.datos.get("sede", "LIMA"))
+    return titulo_anio, titulo_numero, sede
 
-    /* Resto de la pagina */
-    .fuentes{padding:60px 20px;max-width:960px;margin:0 auto}
-    .fuentes h2{font-size:24px;font-weight:800;color:var(--azul);text-align:center;margin-bottom:8px}
-    .fuentes-sub{text-align:center;color:var(--gris2);font-size:14px;margin-bottom:36px}
-    .fuentes-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px}
-    .fuente-card{background:white;border-radius:14px;padding:20px;border:1px solid var(--gris3);transition:box-shadow .2s}
-    .fuente-card:hover{box-shadow:0 4px 20px rgba(0,0,0,0.08)}
-    .fuente-icon{font-size:28px;margin-bottom:10px}
-    .fuente-nombre{font-size:13px;font-weight:700;color:var(--azul);margin-bottom:4px}
-    .fuente-desc{font-size:12px;color:var(--gris2);line-height:1.5}
-    .como{background:var(--azul);color:white;padding:60px 20px;text-align:center}
-    .como h2{font-size:24px;font-weight:800;margin-bottom:40px}
-    .pasos{display:flex;gap:24px;justify-content:center;flex-wrap:wrap;max-width:800px;margin:0 auto}
-    .paso{background:rgba(255,255,255,0.1);border-radius:16px;padding:24px;width:200px}
-    .paso-num{font-size:36px;font-weight:900;color:rgba(255,255,255,0.3);margin-bottom:8px}
-    .paso-titulo{font-size:14px;font-weight:700;margin-bottom:6px}
-    .paso-desc{font-size:12px;opacity:.8;line-height:1.5}
-    footer{background:var(--azul);color:rgba(255,255,255,0.7);text-align:center;padding:24px 20px;font-size:12px;margin-top:1px}
-  </style>
-</head>
-<body>
 
-<section class="hero">
-  <span class="hero-icon">&#x1F697;</span>
-  <h1>Verificador Vehicular Peru</h1>
-  <p>Consulta 20 fuentes oficiales antes de comprar un auto usado. Documentacion, deudas, papeletas e inspeccion tecnica en un solo reporte.</p>
+async def ejecutar_consultas(placa):
+    print("\n" + "=" * 60)
+    print("  VERIFICADOR VEHICULAR -- Placa: {}".format(placa.upper()))
+    print("=" * 60 + "\n")
 
-  <div class="form-card">
-    {% if error %}
-    <div class="error-msg">&#x26A0;&#xFE0F; {{ error }}</div>
-    {% endif %}
+    resultados_doc = []
+    resultados_deudas = []
+    resultados_regiones = []
 
-    <!-- Pestanas -->
-    <div class="tabs">
-      <button class="tab activo" onclick="cambiarTab('individual',this)">&#x1F50D; Consulta Individual</button>
-      <button class="tab" onclick="cambiarTab('masivo',this)">&#x1F4CB; Carga Masiva</button>
-    </div>
+    async with async_playwright() as pw:
+        browser = await pw.chromium.launch(
+            headless=HEADLESS,
+            args=["--start-maximized"]
+        )
+        context = await browser.new_context(
+            viewport={"width": 1280, "height": 800},
+            user_agent=(
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/124.0.0.0 Safari/537.36"
+            )
+        )
 
-    <!-- Panel individual -->
-    <div class="panel activo" id="panel-individual">
-      <label class="form-label">Ingresa la placa del vehiculo</label>
-      <form method="POST" action="/consultar">
-        <div class="form-input-wrap">
-          <input class="form-input" type="text" name="placa"
-                 placeholder="Ej: B1N553"
-                 maxlength="8" autocomplete="off" autofocus
-                 pattern="[A-Za-z0-9\-\s]{5,8}" required/>
-          <button class="btn-verificar" type="submit">
-            &#x1F50D; Verificar
-          </button>
-        </div>
-        <p class="form-hint">Formatos validos: B1N553 &middot; ABC123 &middot; A8R-215</p>
-      </form>
-    </div>
+        # --- BLOQUE 1: Documentacion ---
+        print(C.BOLD + "BLOQUE 1 -- Documentacion del vehiculo" + C.RESET)
+        print("-" * 50)
 
-    <!-- Panel masivo -->
-    <div class="panel" id="panel-masivo">
-      <label class="form-label">Sube tu archivo con las placas</label>
-      <div class="drop-zone" id="dropZone" onclick="document.getElementById('inputArchivo').click()">
-        <span class="drop-icon">&#x1F4C2;</span>
-        <div class="drop-label">Arrastra tu archivo o haz clic para seleccionar</div>
-        <div class="drop-hint">Excel (.xlsx) &middot; Word (.docx) &middot; PDF (.pdf) &middot; Max. 100 placas</div>
-      </div>
-      <input type="file" id="inputArchivo" accept=".xlsx,.xls,.docx,.doc,.pdf,.txt,.csv"/>
-      <div id="msgCargando" class="cargando-msg"></div>
+        page = await context.new_page()
+        print("  Consultando SUNARP vehicular...")
+        r = await sunarp_vehicular.consultar(page, placa)
+        await page.close()
+        imprimir_estado(r.fuente, r.estado)
+        resultados_doc.append(r)
+        sede_vehiculo = r.datos.get("Sede", "") if r.estado in ("ok", "advertencia") else ""
 
-      <div class="placas-detectadas" id="placasDetectadas">
-        <div class="placas-titulo">Placas detectadas &mdash; <span id="totalDetectadas">0</span></div>
-        <div class="placas-grid" id="gridPlacas"></div>
-        <p class="limite-msg">Se procesaran en orden, una a la vez.</p>
-        <button class="btn-iniciar" id="btnIniciar" onclick="iniciarMasivo()">
-          &#x1F680; Iniciar Verificacion Masiva
-        </button>
-      </div>
-    </div>
+        page = await context.new_page()
+        print("  Consultando SOAT APESEG...")
+        r = await soat_apeseg.consultar(page, placa)
+        await page.close()
+        imprimir_estado(r.fuente, r.estado)
+        resultados_doc.append(r)
 
-  </div>
-</section>
+        page = await context.new_page()
+        print("  Consultando MTC Inspeccion Tecnica...")
+        r = await mtc_inspeccion.consultar(page, placa)
+        await page.close()
+        imprimir_estado(r.fuente, r.estado)
+        resultados_doc.append(r)
 
-<section class="fuentes">
-  <h2>&#x1F4CB; 20 Fuentes Oficiales Consultadas</h2>
-  <p class="fuentes-sub">Revisamos todos los registros que importan antes de la compra.</p>
-  <div class="fuentes-grid">
-    <div class="fuente-card"><div class="fuente-icon">&#x1F3E6;</div><div class="fuente-nombre">SUNARP Vehicular</div><div class="fuente-desc">Titularidad, gravamenes, bloqueos registrales y estado legal del vehiculo.</div></div>
-    <div class="fuente-card"><div class="fuente-icon">&#x1F6E1;&#xFE0F;</div><div class="fuente-nombre">SOAT APESEG</div><div class="fuente-desc">Vigencia del Seguro Obligatorio de Accidentes de Transito.</div></div>
-    <div class="fuente-card"><div class="fuente-icon">&#x1F527;</div><div class="fuente-nombre">MTC Inspeccion Tecnica</div><div class="fuente-desc">Historial de revisiones tecnicas vehiculares.</div></div>
-    <div class="fuente-card"><div class="fuente-icon">&#x1F4DC;</div><div class="fuente-nombre">SUNARP SPRL</div><div class="fuente-desc">Historial completo de propietarios anteriores.</div></div>
-    <div class="fuente-card"><div class="fuente-icon">&#x1F9FE;</div><div class="fuente-nombre">SUNARP Siguelo+</div><div class="fuente-desc">Estado de cargas y gravamenes actuales sobre el titulo.</div></div>
-    <div class="fuente-card"><div class="fuente-icon">&#x1F6A6;</div><div class="fuente-nombre">SUTRAN</div><div class="fuente-desc">Infracciones de transporte y sanciones a nivel nacional.</div></div>
-    <div class="fuente-card"><div class="fuente-icon">&#x1F68C;</div><div class="fuente-nombre">ATU Lima</div><div class="fuente-desc">Multas de transporte urbano en la capital.</div></div>
-    <div class="fuente-card"><div class="fuente-icon">&#x1F3E5;</div><div class="fuente-nombre">SBS Accidentes SOAT</div><div class="fuente-desc">Siniestros registrados en el sistema de seguros.</div></div>
-    <div class="fuente-card"><div class="fuente-icon">&#x1F6DF;</div><div class="fuente-nombre">Callao &amp; GNV/FISE</div><div class="fuente-desc">Papeletas del Callao y deuda de conversion GNV.</div></div>
-    <div class="fuente-card"><div class="fuente-icon">&#x1F4CD;</div><div class="fuente-nombre">10 Municipalidades Regionales</div><div class="fuente-desc">Trujillo, Piura, Chiclayo, Arequipa, Tacna, Ica, Cajamarca, Huancayo, Chachapoyas y Tarapoto.</div></div>
-  </div>
-</section>
+        page = await context.new_page()
+        print("  Consultando SUNARP SPRL (historial propietarios)...")
+        r_sprl = await sunarp_sprl.consultar(page, placa, sede=sede_vehiculo)
+        await page.close()
+        imprimir_estado(r_sprl.fuente, r_sprl.estado)
+        resultados_doc.append(r_sprl)
 
-<section class="como">
-  <h2>Como funciona</h2>
-  <div class="pasos">
-    <div class="paso"><div class="paso-num">1</div><div class="paso-titulo">Ingresa la placa</div><div class="paso-desc">Escribe la placa del vehiculo que deseas verificar.</div></div>
-    <div class="paso"><div class="paso-num">2</div><div class="paso-titulo">Consulta automatica</div><div class="paso-desc">Consultamos 20 fuentes oficiales en tiempo real.</div></div>
-    <div class="paso"><div class="paso-num">3</div><div class="paso-titulo">Inspeccion visual</div><div class="paso-desc">Completa el checklist de 45 puntos de inspeccion.</div></div>
-    <div class="paso"><div class="paso-num">4</div><div class="paso-titulo">Veredicto final</div><div class="paso-desc">Obtenes un reporte completo y recomendaciones de compra.</div></div>
-  </div>
-</section>
+        titulo_anio, titulo_numero, sede = extraer_datos_sprl(r_sprl)
+        page = await context.new_page()
+        print("  Consultando SUNARP SigueloPlus (monto pagado)...")
+        r = await sunarp_siguelo.consultar(
+            page,
+            titulo_numero=titulo_numero,
+            titulo_anio=titulo_anio,
+            oficina_registral=sede or "LIMA"
+        )
+        await page.close()
+        imprimir_estado(r.fuente, r.estado)
+        resultados_doc.append(r)
 
-<footer>
-  <p>Verificador Vehicular Peru &mdash; Herramienta de apoyo para la compra informada de vehiculos usados.</p>
-  <p style="margin-top:6px">Los datos provienen de fuentes oficiales pero pueden no estar actualizados al momento de la consulta.</p>
-</footer>
+        # --- BLOQUE 2: Deudas e Infracciones ---
+        print("\n" + C.BOLD + "BLOQUE 2 -- Deudas e Infracciones" + C.RESET)
+        print("-" * 50)
 
-<script>
-// Tabs
-function cambiarTab(id, btn) {
-  document.querySelectorAll(".tab").forEach(function(t){ t.classList.remove("activo"); });
-  document.querySelectorAll(".panel").forEach(function(p){ p.classList.remove("activo"); });
-  btn.classList.add("activo");
-  document.getElementById("panel-" + id).classList.add("activo");
-}
+        for nombre, modulo in [
+            ("SUTRAN infracciones",  sutran),
+            ("ATU multas",           atu),
+            ("SBS accidentes SOAT",  sbs_accidentes),
+            ("Callao papeletas",     callao),
+            ("FISE GNV deuda",       gnv_fise),
+        ]:
+            page = await context.new_page()
+            print("  Consultando {}...".format(nombre))
+            r = await modulo.consultar(page, placa)
+            await page.close()
+            imprimir_estado(r.fuente, r.estado)
+            resultados_deudas.append(r)
 
-// Drag & drop
-var dz = document.getElementById("dropZone");
-dz.addEventListener("dragover", function(e){ e.preventDefault(); dz.classList.add("drag-over"); });
-dz.addEventListener("dragleave", function(){ dz.classList.remove("drag-over"); });
-dz.addEventListener("drop", function(e){
-  e.preventDefault();
-  dz.classList.remove("drag-over");
-  var f = e.dataTransfer.files[0];
-  if (f) procesarArchivo(f);
-});
-document.getElementById("inputArchivo").addEventListener("change", function(e){
-  if (e.target.files[0]) procesarArchivo(e.target.files[0]);
-});
+        # --- BLOQUE 3: Papeletas Regionales ---
+        print("\n" + C.BOLD + "BLOQUE 3 -- Papeletas Regionales" + C.RESET)
+        print("-" * 50)
 
-var placasActuales = [];
+        scrapers_regionales = [
+            ("Trujillo",   trujillo),
+            ("Piura",      piura),
+            ("Chiclayo",   chiclayo),
+            ("Tarapoto",   tarapoto),
+            ("Cajamarca",  cajamarca),
+            ("Chachapoyas",chachapoyas),
+            ("Huancayo",   huancayo),
+            ("Ica",        ica),
+            ("Tacna",      tacna),
+            ("Arequipa",   arequipa),
+        ]
 
-function procesarArchivo(archivo) {
-  var msg = document.getElementById("msgCargando");
-  msg.textContent = "Analizando archivo...";
-  document.getElementById("placasDetectadas").style.display = "none";
-  placasActuales = [];
+        for nombre, modulo in scrapers_regionales:
+            page = await context.new_page()
+            print("  Consultando {}...".format(nombre))
+            r = await modulo.consultar(page, placa)
+            await page.close()
+            imprimir_estado(r.fuente, r.estado)
+            resultados_regiones.append(r)
 
-  var fd = new FormData();
-  fd.append("archivo", archivo);
+        await browser.close()
 
-  fetch("/masivo/cargar", { method: "POST", body: fd })
-    .then(function(res){ return res.json(); })
-    .then(function(data){
-      if (data.error) {
-        msg.innerHTML = '<span style="color:#c53030">&#x26A0; ' + data.error + '</span>';
-        return;
-      }
-      placasActuales = data.placas;
-      msg.textContent = "";
-      renderPlacas(placasActuales);
-    })
-    .catch(function(){
-      msg.innerHTML = '<span style="color:#c53030">&#x26A0; Error al procesar el archivo.</span>';
-    });
-}
+    return resultados_doc, resultados_deudas, resultados_regiones
 
-function renderPlacas(placas) {
-  var grid = document.getElementById("gridPlacas");
-  grid.innerHTML = "";
-  document.getElementById("totalDetectadas").textContent = placas.length;
-  placas.forEach(function(p){
-    var tag = document.createElement("div");
-    tag.className = "placa-tag";
-    tag.id = "tag-" + p;
-    tag.innerHTML = p + '<span class="remove" onclick="quitarPlaca(\'' + p + '\')">&times;</span>';
-    grid.appendChild(tag);
-  });
-  document.getElementById("placasDetectadas").style.display = "block";
-  document.getElementById("btnIniciar").disabled = placas.length === 0;
-}
 
-function quitarPlaca(p) {
-  placasActuales = placasActuales.filter(function(x){ return x !== p; });
-  var tag = document.getElementById("tag-" + p);
-  if (tag) tag.remove();
-  document.getElementById("totalDetectadas").textContent = placasActuales.length;
-  document.getElementById("btnIniciar").disabled = placasActuales.length === 0;
-}
+def main():
+    if len(sys.argv) > 1:
+        placa = sys.argv[1].strip().upper()
+    else:
+        placa = input("\n  Ingresa la PLACA del vehiculo a consultar: ").strip().upper()
 
-function iniciarMasivo() {
-  if (!placasActuales.length) return;
-  var btn = document.getElementById("btnIniciar");
-  btn.disabled = true;
-  btn.textContent = "Iniciando...";
+    if not placa:
+        print(C.RED + "Error: debes ingresar una placa." + C.RESET)
+        sys.exit(1)
 
-  fetch("/masivo/iniciar", {
-    method: "POST",
-    headers: {"Content-Type":"application/json"},
-    body: JSON.stringify({placas: placasActuales})
-  })
-  .then(function(res){ return res.json(); })
-  .then(function(data){
-    if (data.error) {
-      document.getElementById("msgCargando").innerHTML =
-        '<span style="color:#c53030">&#x26A0; ' + data.error + '</span>';
-      btn.disabled = false;
-      btn.textContent = "Iniciar Verificacion Masiva";
-      return;
-    }
-    window.location.href = "/masivo/" + data.bid;
-  })
-  .catch(function(){
-    document.getElementById("msgCargando").innerHTML =
-      '<span style="color:#c53030">&#x26A0; Error al iniciar. Intenta de nuevo.</span>';
-    btn.disabled = false;
-    btn.textContent = "Iniciar Verificacion Masiva";
-  });
-}
-</script>
-</body>
-</html>
+    try:
+        resultados_doc, resultados_deudas, resultados_regiones = asyncio.run(
+            ejecutar_consultas(placa)
+        )
+    except KeyboardInterrupt:
+        print("\n" + C.YELLOW + "Consulta cancelada por el usuario." + C.RESET)
+        sys.exit(0)
+
+    print("\nGenerando reporte HTML...")
+    ruta_reporte = generar_reporte(
+        placa=placa,
+        resultados_doc=resultados_doc,
+        resultados_deudas=resultados_deudas,
+        resultados_regiones=resultados_regiones,
+    )
+    print("  Reporte guardado en: " + ruta_reporte)
+
+    webbrowser.open("file:///" + ruta_reporte.replace(os.sep, "/"))
+
+    todos = resultados_doc + resultados_deudas + resultados_regiones
+    ok          = sum(1 for r in todos if r.estado == "ok")
+    advertencia = sum(1 for r in todos if r.estado == "advertencia")
+    error       = sum(1 for r in todos if r.estado == "error")
+    sin_datos   = sum(1 for r in todos if r.estado == "sin_datos")
+
+    print("\n" + "=" * 60)
+    print("  RESUMEN FINAL -- {}".format(placa))
+    print("=" * 60)
+    print(C.GREEN  + "  Sin problemas  : {}".format(ok)          + C.RESET)
+    print(C.YELLOW + "  Advertencias   : {}".format(advertencia) + C.RESET)
+    print(C.RED    + "  Errores        : {}".format(error)       + C.RESET)
+    print(C.GRAY   + "  Sin datos      : {}".format(sin_datos)   + C.RESET)
+    print(C.CYAN   + "  Total consultas: {}".format(len(todos))  + C.RESET)
+
+    if advertencia > 0:
+        print("\n" + C.YELLOW + "  Hay advertencias -- revisa el reporte antes de comprar." + C.RESET)
+    elif error == 0 and advertencia == 0:
+        print("\n" + C.GREEN + "  Sin problemas detectados." + C.RESET)
+    print("=" * 60 + "\n")
+
+
+if __name__ == "__main__":
+    main()

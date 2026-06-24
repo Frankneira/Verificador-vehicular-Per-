@@ -1,264 +1,164 @@
 """
-sunarp_sprl.py — Historial de propietarios en SUNARP SPRL.
-URL: https://sprl.sunarp.gob.pe/sprl/main/partidas-base-grafica-registral
+sunarp_siguelo.py — Consulta de monto pagado por el vehículo en SUNARP SigueloPlus.
+URL: https://sigueloplus.sunarp.gob.pe/siguelo/
 
-Proceso multi-paso:
-  1. Login con usuario y contraseña
-  2. Seleccionar Oficina Registral (obtenida de la consulta SUNARP vehicular)
-  3. Área registral: Propiedad Vehicular
-  4. Buscar por Placa
-  5. Ver asientos → click en el último título (cuadro verde)
-  6. Extraer: Título, Inscripción, Presentación, Rubro, Acto, Participantes
-  7. Detectar alertas: "Embargo", "Prescripción de dominio"
+Proceso:
+  1. Navegar al portal SigueloPlus
+  2. Ingresar Oficina Registral, Año del título y Número del título
+     (estos datos provienen del resultado de sunarp_sprl.py)
+  3. Click en "Acceder al asiento de inscripción y TIVE"
+  4. Click en el ícono verde
+  5. Extraer: Acto, Precio, Monto pagado, Fecha, Fecha de asiento
 
-Retorna también el número de título para uso en sunarp_siguelo.py.
+NOTA: Este scraper necesita el número de título obtenido de SUNARP SPRL.
+Si no se dispone del título, se marca como sin_datos.
 """
 import asyncio
+import re
 from playwright.async_api import Page, TimeoutError as PWTimeout
-from config import URLS, TIMEOUT, SUNARP_SPRL_USUARIO, SUNARP_SPRL_CLAVE
+from config import URLS, TIMEOUT
 from scrapers.base import ResultadoConsulta
 
 
-# Palabras clave que generan alerta legal
-ALERTAS_LEGALES = [
-    "prescripción de dominio", "embargo", "medida cautelar",
-    "anotación de demanda", "hipoteca", "gravamen", "prohibición",
-    "inmovilización", "bloqueo registral",
-]
-
-
-async def consultar(page: Page, placa: str, sede: str = "") -> ResultadoConsulta:
+async def consultar(
+    page: Page,
+    titulo_numero: str = "",
+    titulo_anio: str = "",
+    oficina_registral: str = "LIMA"
+) -> ResultadoConsulta:
     """
     Args:
-        page  : Página de Playwright (contexto compartido).
-        placa : Placa del vehículo.
-        sede  : Sede/Oficina registral (ej: "LIMA", obtenida de SUNARP vehicular).
-                Si está vacía, se intenta con "LIMA" por defecto.
+        page              : Página de Playwright.
+        titulo_numero     : Número de título obtenido de SUNARP SPRL (ej: "00735749").
+        titulo_anio       : Año del título (ej: "2024").
+        oficina_registral : Oficina registral (ej: "LIMA").
     """
     resultado = ResultadoConsulta(
-        fuente="SUNARP SPRL — Historial de Propietarios",
-        url=URLS["sunarp_sprl"]
+        fuente="SUNARP SigueloPlus — Monto Pagado por el Vehículo",
+        url=URLS["sunarp_siguelo"]
     )
 
-    if not SUNARP_SPRL_USUARIO or not SUNARP_SPRL_CLAVE:
-        resultado.marcar_error(
-            "Credenciales SUNARP SPRL no configuradas. "
-            "Completa SUNARP_SPRL_USUARIO y SUNARP_SPRL_CLAVE en el archivo .env"
+    # Validar que tenemos el número de título
+    if not titulo_numero or not titulo_anio:
+        resultado.marcar_sin_datos(
+            "No se dispone del número de título registral. "
+            "Este dato es obtenido automáticamente de la consulta SUNARP SPRL (paso 4). "
+            "Si el SPRL falló, esta consulta no puede ejecutarse."
         )
         return resultado
 
-    oficina = sede.strip().upper() if sede else "LIMA"
-
     try:
-        # ── PASO 1: Navegar al portal SPRL ──────────────────────────────────
-        await page.goto(URLS["sunarp_sprl"], timeout=TIMEOUT, wait_until="domcontentloaded")
+        await page.goto(URLS["sunarp_siguelo"], timeout=TIMEOUT, wait_until="domcontentloaded")
         await asyncio.sleep(2)
 
-        # ── PASO 2: Login ────────────────────────────────────────────────────
-        # Campo usuario
-        campo_usuario = page.locator(
-            "input[name*='user' i], input[id*='user' i], "
-            "input[placeholder*='usuario' i], input[type='text']:first-of-type"
-        )
-        await campo_usuario.first.wait_for(state="visible", timeout=TIMEOUT)
-        await campo_usuario.first.fill(SUNARP_SPRL_USUARIO)
-
-        # Campo contraseña
-        campo_clave = page.locator("input[type='password']")
-        await campo_clave.first.fill(SUNARP_SPRL_CLAVE)
-
-        # Botón ingresar
-        btn_login = page.locator(
-            "button:has-text('Ingresar'), button:has-text('Iniciar'), "
-            "input[type='submit'], button[type='submit']"
-        )
-        await btn_login.first.click()
-        await asyncio.sleep(3)
-
-        # Verificar login exitoso (esperar que desaparezca el formulario de login)
-        try:
-            await page.wait_for_selector(
-                "input[type='password']",
-                state="hidden",
-                timeout=10_000
-            )
-        except PWTimeout:
-            # Verificar si hay mensaje de error de login
-            error_texto = await page.locator(".error, .alert-danger, .msg-error").first.inner_text() if await page.locator(".error, .alert-danger").count() > 0 else ""
-            resultado.marcar_error(
-                f"Login fallido en SUNARP SPRL. "
-                f"Verifica usuario/contraseña en .env. {error_texto}".strip()
-            )
-            return resultado
-
-        # ── PASO 3: Seleccionar Oficina Registral ────────────────────────────
-        await asyncio.sleep(2)
+        # ── PASO 1: Seleccionar Oficina Registral ────────────────────────────
         selector_oficina = page.locator(
             "select[id*='oficina' i], select[name*='oficina' i], "
-            "select[id*='sede' i], select[name*='sede' i]"
+            "select[id*='sede' i], select:first-of-type"
         )
         if await selector_oficina.count() > 0:
-            # Intentar seleccionar por texto de la sede
             try:
-                await selector_oficina.first.select_option(label=oficina)
+                await selector_oficina.first.select_option(label=oficina_registral)
             except Exception:
-                # Si no encuentra exacto, seleccionar la opción que contenga el texto
                 opciones = await selector_oficina.first.locator("option").all()
                 for op in opciones:
-                    texto_op = (await op.inner_text()).upper()
-                    if oficina in texto_op or "LIMA" in texto_op:
-                        valor = await op.get_attribute("value")
-                        await selector_oficina.first.select_option(value=valor)
+                    if oficina_registral.upper() in (await op.inner_text()).upper():
+                        await selector_oficina.first.select_option(
+                            value=await op.get_attribute("value")
+                        )
                         break
-            await asyncio.sleep(1)
-
-        # ── PASO 4: Seleccionar Área Registral → Propiedad Vehicular ─────────
-        selector_area = page.locator(
-            "select[id*='area' i], select[name*='area' i], "
-            "select[id*='registro' i]"
-        )
-        if await selector_area.count() > 0:
-            try:
-                await selector_area.first.select_option(label="Propiedad Vehicular")
-            except Exception:
-                try:
-                    await selector_area.first.select_option(label="PROPIEDAD VEHICULAR")
-                except Exception:
-                    pass
-            await asyncio.sleep(1)
-
-        # ── PASO 5: Buscar por Placa ─────────────────────────────────────────
-        # Seleccionar criterio "Placa"
-        selector_criterio = page.locator(
-            "select[id*='criterio' i], select[name*='criterio' i], "
-            "select[id*='tipo' i], select[id*='buscar' i]"
-        )
-        if await selector_criterio.count() > 0:
-            try:
-                await selector_criterio.first.select_option(label="Placa")
-            except Exception:
-                try:
-                    await selector_criterio.first.select_option(label="PLACA")
-                except Exception:
-                    pass
             await asyncio.sleep(0.5)
 
-        # Ingresar placa
-        campo_placa = page.locator(
-            "input[id*='plac' i], input[name*='plac' i], "
-            "input[placeholder*='plac' i], input[type='text']:last-of-type"
+        # ── PASO 2: Año del título ────────────────────────────────────────────
+        campo_anio = page.locator(
+            "input[id*='anio' i], input[name*='anio' i], input[id*='año' i], "
+            "input[placeholder*='año' i], input[placeholder*='anio' i]"
         )
-        await campo_placa.first.wait_for(state="visible", timeout=TIMEOUT)
-        await campo_placa.first.fill(placa.upper().strip())
+        if await campo_anio.count() > 0:
+            await campo_anio.first.fill(titulo_anio.strip())
+        await asyncio.sleep(0.3)
 
-        # Botón buscar
+        # ── PASO 3: Número del título ─────────────────────────────────────────
+        campo_numero = page.locator(
+            "input[id*='numero' i], input[name*='numero' i], "
+            "input[placeholder*='número' i], input[placeholder*='titulo' i], "
+            "input[type='text']:last-of-type"
+        )
+        await campo_numero.first.fill(titulo_numero.strip())
+
+        # ── PASO 4: Botón Buscar ──────────────────────────────────────────────
         btn_buscar = page.locator(
-            "button:has-text('Buscar'), button:has-text('Consultar'), "
-            "button[type='submit'], input[value*='Buscar' i]"
+            "button:has-text('Buscar'), input[type='submit'], "
+            "button[type='submit'], button:has-text('Consultar')"
         )
         await btn_buscar.first.click()
         await asyncio.sleep(3)
 
-        # ── PASO 6: Ver Asientos ─────────────────────────────────────────────
-        btn_asientos = page.locator(
-            "button:has-text('Ver asientos'), a:has-text('Ver asientos'), "
-            "button:has-text('Asientos'), a:has-text('Asientos'), "
-            ".btn-asientos, [title*='asiento' i]"
+        # ── PASO 5: Click en "Acceder al asiento de inscripción y TIVE" ──────
+        btn_acceder = page.locator(
+            "a:has-text('Acceder'), button:has-text('Acceder'), "
+            "a:has-text('asiento'), a:has-text('TIVE'), "
+            ".btn-acceder, [title*='asiento' i]"
         )
-        await btn_asientos.first.wait_for(state="visible", timeout=TIMEOUT)
-        await btn_asientos.first.click()
-        await asyncio.sleep(3)
-
-        # ── PASO 7: Click en el último título (cuadro verde) ─────────────────
-        # Los títulos aparecen como filas — tomar el último
-        titulos = page.locator(
-            "table tr.green, table tr.titulo, .titulo-item, "
-            ".cuadro-verde, tr[class*='green'], tr[class*='titulo']"
-        )
-        count = await titulos.count()
-
-        if count == 0:
-            # Intentar con cualquier fila de tabla y tomar la última
-            titulos = page.locator("table tbody tr")
-            count = await titulos.count()
-
-        if count == 0:
-            resultado.marcar_sin_datos(
-                "No se encontraron títulos registrales para esta placa en SUNARP SPRL."
-            )
-            return resultado
-
-        # Guardar cantidad de títulos
-        total_titulos = count
-
-        # Click en el último título — abre popup o nueva ventana
-        ultimo_titulo = titulos.nth(count - 1)
-
-        # Manejar nueva ventana/popup
-        async with page.context.expect_page() as nueva_pagina_info:
-            await ultimo_titulo.click()
-            await asyncio.sleep(1)
-
-        nueva_pagina = await nueva_pagina_info.value
-        await nueva_pagina.wait_for_load_state("domcontentloaded")
+        await btn_acceder.first.wait_for(state="visible", timeout=TIMEOUT)
+        await btn_acceder.first.click()
         await asyncio.sleep(2)
 
-        # ── PASO 8: Extraer datos del asiento ────────────────────────────────
-        contenido_total = await nueva_pagina.content()
-        texto_total = await nueva_pagina.locator("body").inner_text()
+        # ── PASO 6: Click en ícono verde ─────────────────────────────────────
+        icono_verde = page.locator(
+            ".btn-success, .btn-green, button.green, a.green, "
+            "img[src*='green'], .icon-green, td.green a, "
+            "button:has-text('Ver'), a[title*='ver' i]"
+        )
+        if await icono_verde.count() > 0:
+            # Manejar posible nueva ventana/popup
+            try:
+                async with page.context.expect_page(timeout=5_000) as nueva_p_info:
+                    await icono_verde.first.click()
+                nueva_pagina = await nueva_p_info.value
+                await nueva_pagina.wait_for_load_state("domcontentloaded")
+                await asyncio.sleep(2)
+                texto_resultado = await nueva_pagina.locator("body").inner_text()
+                await nueva_pagina.close()
+            except Exception:
+                await icono_verde.first.click()
+                await asyncio.sleep(2)
+                texto_resultado = await page.locator("body").inner_text()
+        else:
+            texto_resultado = await page.locator("body").inner_text()
 
+        # ── PASO 7: Extraer datos ─────────────────────────────────────────────
         datos = {
-            "Total de títulos registrados": str(total_titulos),
+            "Año / Título": f"{titulo_anio} — {titulo_numero}",
+            "Oficina Registral": oficina_registral,
         }
 
-        # Extraer campos específicos por su label
-        campos_objetivo = [
-            "Título", "Inscripción", "Presentación", "Rubro",
-            "Acto", "Participantes Naturales", "Participantes Jurídicos",
-        ]
+        campos_a_extraer = ["Acto", "Precio", "Monto pagado", "Fecha", "Fecha de asiento"]
+        for campo in campos_a_extraer:
+            patron = rf"{campo}\s*[:\-]?\s*(.+?)(?=\n|$)"
+            m = re.search(patron, texto_resultado, re.IGNORECASE)
+            if m:
+                datos[campo] = m.group(1).strip()
 
-        filas = await nueva_pagina.locator("table tr, .field-row, dl dt").all()
+        # Extraer también de tabla si existe
+        filas = await page.locator("table tr").all()
         for fila in filas:
             texto = await fila.inner_text()
             partes = [p.strip() for p in texto.split("\n") if p.strip()]
             if len(partes) >= 2:
-                clave = partes[0].rstrip(":")
-                valor = " ".join(partes[1:]).strip()
-                datos[clave] = valor
+                datos[partes[0].rstrip(":")] = " ".join(partes[1:])
 
-        # Si no se obtuvo nada de las filas, parsear el texto plano
-        if len(datos) <= 1:
-            import re
-            for campo in campos_objetivo:
-                patron = rf"{campo}\s*[:\-]?\s*(.+?)(?=\n|$)"
-                m = re.search(patron, texto_total, re.IGNORECASE)
-                if m:
-                    datos[campo] = m.group(1).strip()
-
-        # ── PASO 9: Detectar alertas legales ─────────────────────────────────
-        alertas_encontradas = [
-            alerta.title() for alerta in ALERTAS_LEGALES
-            if alerta in texto_total.lower()
-        ]
-
-        await nueva_pagina.close()
-
-        if alertas_encontradas:
-            resultado.marcar_advertencia(
-                datos,
-                f"🚨 ALERTA LEGAL detectada en el registro: "
-                f"{', '.join(alertas_encontradas)}. "
-                f"Consulta a un abogado antes de proceder con la compra."
-            )
-        else:
+        if len(datos) > 2:  # Más que solo los campos base
             resultado.marcar_ok(datos)
+        else:
+            resultado.marcar_sin_datos(
+                "Se ejecutó la consulta pero no se pudo extraer el monto. "
+                "Es posible que el portal haya cambiado su estructura."
+            )
 
     except PWTimeout:
-        resultado.marcar_error(
-            "Tiempo de espera agotado en SUNARP SPRL. "
-            "El portal puede estar lento o requiere resolver un CAPTCHA."
-        )
+        resultado.marcar_error("Tiempo de espera agotado en SUNARP SigueloPlus.")
     except Exception as exc:
-        resultado.marcar_error(f"Error en SUNARP SPRL: {exc}")
+        resultado.marcar_error(f"Error en SigueloPlus: {exc}")
 
     return resultado
