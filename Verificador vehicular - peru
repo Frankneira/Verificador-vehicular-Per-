@@ -1,0 +1,3640 @@
+"""
+checklist.py -- Checklist de inspeccion visual y tecnica antes de comprar un auto usado.
+Basado en fuentes: masmotor.mx, tuauto.com.pe, blog.one.com.pe, autofact.com.pe
+
+Estructura de cada item:
+  id       : identificador unico
+  categoria: grupo al que pertenece
+  item     : descripcion del punto a revisar
+  detalle  : que buscar / que significa
+  critico  : True si un fallo aqui es motivo de rechazo inmediato
+"""
+
+CATEGORIAS = [
+    "exterior",
+    "interior",
+    "motor",
+    "chasis",
+    "prueba_manejo",
+]
+
+CHECKLIST = [
+    # ── EXTERIOR ──────────────────────────────────────────────────────────────
+    {
+        "id": "E01", "categoria": "exterior", "critico": True,
+        "item": "Uniformidad de la pintura",
+        "detalle": "Bajo luz natural, verificar que el color sea exactamente igual en todas las partes. Diferencias indican repintura por golpe o accidente.",
+    },
+    {
+        "id": "E02", "categoria": "exterior", "critico": True,
+        "item": "Alineacion de puertas, capo y maletero",
+        "detalle": "Las separaciones entre paneles deben ser uniformes. Espacios irregulares o asimetricos revelan accidentes o reparaciones deficientes.",
+    },
+    {
+        "id": "E03", "categoria": "exterior", "critico": False,
+        "item": "Estado de los paneles (abolladuras, ondulaciones)",
+        "detalle": "Pasar la mano sobre cada panel. Las ondulaciones ocultas indican masilla o relleno sobre golpes.",
+    },
+    {
+        "id": "E04", "categoria": "exterior", "critico": True,
+        "item": "Signos de herrumbre o corrosion",
+        "detalle": "Revisar debajo de los marcos de las puertas, paso de ruedas y partes bajas. La corrosion estructural es irreparable de forma economica.",
+    },
+    {
+        "id": "E05", "categoria": "exterior", "critico": False,
+        "item": "Estado de vidrios y parabrisas",
+        "detalle": "Buscar fisuras, rayones profundos o estrellas. Un parabrisas danado es peligroso y costoso de reemplazar.",
+    },
+    {
+        "id": "E06", "categoria": "exterior", "critico": False,
+        "item": "Estado de las gomas y burlete de puertas",
+        "detalle": "Las gomas resecas o rotas permiten entrada de agua y ruido. Indicador de falta de mantenimiento.",
+    },
+    {
+        "id": "E07", "categoria": "exterior", "critico": False,
+        "item": "Funcionamiento de luces (delanteras, traseras, neblineros)",
+        "detalle": "Probar todas las luces: cruce, largas, direccionales, freno, reversa y neblineros. Verificar que los faros no tengan agua interior.",
+    },
+    {
+        "id": "E08", "categoria": "exterior", "critico": True,
+        "item": "Estado de neumaticos (4 + repuesto)",
+        "detalle": "La banda de rodaje debe ser mayor a 3mm (insertar una moneda de S/1: si se ve el 'sol' completo, estan desgastados). Desgaste irregular indica problemas de alineacion o suspension.",
+    },
+    {
+        "id": "E09", "categoria": "exterior", "critico": False,
+        "item": "Estado de los rines",
+        "detalle": "Golpes o rayaduras profundas en los rines pueden indicar que el vehiculo ha sufrido impactos o ha circulado con llantas bajas.",
+    },
+    {
+        "id": "E10", "categoria": "exterior", "critico": False,
+        "item": "Funcionamiento de cerraduras y manijas",
+        "detalle": "Probar todas las puertas desde adentro y afuera. Verificar el cierre centralizado si aplica.",
+    },
+
+    # ── INTERIOR ──────────────────────────────────────────────────────────────
+    {
+        "id": "I01", "categoria": "interior", "critico": False,
+        "item": "Estado de tapiceria (asientos, techo, alfombra)",
+        "detalle": "Manchas de humedad o moho en el techo o alfombra indican filtraciones de agua. El costo de reparacion puede ser elevado.",
+    },
+    {
+        "id": "I02", "categoria": "interior", "critico": True,
+        "item": "Panel de instrumentos sin luces de advertencia",
+        "detalle": "Encender el motor y verificar que ningun testigo permanezca encendido (check engine, ABS, airbag, temperatura, presion de aceite).",
+    },
+    {
+        "id": "I03", "categoria": "interior", "critico": True,
+        "item": "Sistema de airbags (sin testigos de falla)",
+        "detalle": "El testigo del airbag debe encenderse al arrancar y apagarse. Si queda encendido, el sistema esta desactivado o fue activado en un accidente.",
+    },
+    {
+        "id": "I04", "categoria": "interior", "critico": True,
+        "item": "Cinturones de seguridad (los 5)",
+        "detalle": "Probar que todos los cinturones se enrollen correctamente y que los seguros encajen con click firme. Cinturones que no se retraen deben cambiarse.",
+    },
+    {
+        "id": "I05", "categoria": "interior", "critico": False,
+        "item": "Aire acondicionado y calefaccion",
+        "detalle": "Encender el A/C y verificar que enfrie en menos de 2 minutos. Un gas insuficiente o compresor danado es costoso de reparar.",
+    },
+    {
+        "id": "I06", "categoria": "interior", "critico": False,
+        "item": "Sistema electrico (vidrios electricos, espejos, sunroof)",
+        "detalle": "Operar cada control electrico. Los motores de vidrios electricos son caros de reemplazar.",
+    },
+    {
+        "id": "I07", "categoria": "interior", "critico": False,
+        "item": "Sistema de audio y pantalla",
+        "detalle": "Probar radio, Bluetooth, USB. Si el equipo fue reemplazado puede indicar robo del original.",
+    },
+    {
+        "id": "I08", "categoria": "interior", "critico": False,
+        "item": "Kilometraje en el odometro",
+        "detalle": "Un auto promedio recorre 15,000-20,000 km/anio. Desconfiar si el kilometraje es inusualmente bajo para el anio o si hay signos de adulteracion.",
+    },
+    {
+        "id": "I09", "categoria": "interior", "critico": False,
+        "item": "Estado del volante y palanca de cambios",
+        "detalle": "El desgaste del volante y palanca puede revelar el uso real, que puede no coincidir con el odometro.",
+    },
+    {
+        "id": "I10", "categoria": "interior", "critico": False,
+        "item": "Pedales (freno, acelerador, embrague)",
+        "detalle": "Los pedales desgastados en un vehiculo de bajo kilometraje son una contradiccion que sugiere adulteracion del odometro.",
+    },
+
+    # ── MOTOR ─────────────────────────────────────────────────────────────────
+    {
+        "id": "M01", "categoria": "motor", "critico": True,
+        "item": "Sin fugas de aceite (bajo el capo y en el suelo)",
+        "detalle": "Manchas de aceite debajo del motor indican fugas. Colocar carton blanco durante 15 minutos para detectarlas.",
+    },
+    {
+        "id": "M02", "categoria": "motor", "critico": True,
+        "item": "Color y nivel del aceite de motor",
+        "detalle": "El aceite debe ser ambar oscuro a negro. Si es grisaceo o cremoso (emulsionado) puede indicar falla de empaque de culata (agua mezclada con aceite). Extremadamente critico.",
+    },
+    {
+        "id": "M03", "categoria": "motor", "critico": True,
+        "item": "Color y nivel del liquido refrigerante",
+        "detalle": "Debe ser verde, azul o naranja segun la marca. Si es color chocolate o tiene residuos aceitosos, hay mezcla con aceite. Critico.",
+    },
+    {
+        "id": "M04", "categoria": "motor", "critico": False,
+        "item": "Nivel del liquido de frenos",
+        "detalle": "Debe estar entre MIN y MAX. Si esta bajo puede indicar pastillas desgastadas o fuga en el circuito hidraulico.",
+    },
+    {
+        "id": "M05", "categoria": "motor", "critico": False,
+        "item": "Estado de correas (distribucion, alternador)",
+        "detalle": "Las correas no deben tener grietas ni desgastes. La correa de distribucion es critica: su rotura puede destruir el motor.",
+    },
+    {
+        "id": "M06", "categoria": "motor", "critico": False,
+        "item": "Estado de mangueras y conexiones",
+        "detalle": "Ninguna manguera debe estar reseca, agrietada o con remiendos. Verificar que las abrazaderas esten firmes.",
+    },
+    {
+        "id": "M07", "categoria": "motor", "critico": False,
+        "item": "Bateria (estado y fecha de fabricacion)",
+        "detalle": "Una bateria tiene vida util de 2-3 anios. Verificar que los terminales no tengan corrosion (polvo blanco/verde).",
+    },
+    {
+        "id": "M08", "categoria": "motor", "critico": False,
+        "item": "Ruidos anormales al encender (golpeteos, silbidos)",
+        "detalle": "Un motor sano arranca suave. Golpeteos metalicos indican falla de bielas o ciguenal. Silbidos en correas o problema de admision.",
+    },
+    {
+        "id": "M09", "categoria": "motor", "critico": False,
+        "item": "Color del humo del escape",
+        "detalle": "Humo blanco persistente: agua en motor. Humo azul: aceite quemado. Humo negro: mezcla rica de combustible. Todos son problemas serios.",
+    },
+    {
+        "id": "M10", "categoria": "motor", "critico": False,
+        "item": "Temperatura del motor en ralenti",
+        "detalle": "Dejar el motor en ralenti 5 minutos. La temperatura debe estabilizarse al centro. Si sube demasiado hay problema de refrigeracion.",
+    },
+
+    # ── CHASIS Y PARTE INFERIOR ───────────────────────────────────────────────
+    {
+        "id": "C01", "categoria": "chasis", "critico": True,
+        "item": "Soldaduras o danos estructurales en el chasis",
+        "detalle": "Inspeccionar debajo del vehiculo con linterna. Soldaduras recientes o zonas repintadas indican accidente estructural grave.",
+    },
+    {
+        "id": "C02", "categoria": "chasis", "critico": True,
+        "item": "Estado de amortiguadores",
+        "detalle": "Presionar fuerte cada esquina del vehiculo: debe rebotar 1 vez y detenerse. Si rebota mas, los amortiguadores estan gastados.",
+    },
+    {
+        "id": "C03", "categoria": "chasis", "critico": False,
+        "item": "Estado de bujes y rotulas de suspension",
+        "detalle": "Con el vehiculo en rampa, mover las ruedas: no deben tener juego ni hacer ruidos. Cambio costoso si hay falla.",
+    },
+    {
+        "id": "C04", "categoria": "chasis", "critico": False,
+        "item": "Sistema de frenos (discos y pastillas)",
+        "detalle": "Las estraciones en los discos deben ser superficiales. Verificar que no haya fugas en mangueras o cilindros de freno.",
+    },
+    {
+        "id": "C05", "categoria": "chasis", "critico": False,
+        "item": "Estado del sistema de escape",
+        "detalle": "Sin perforaciones, sin oxido avanzado, bien sujeto. Un escape roto es peligroso por filtracion de gases al habitaculo.",
+    },
+    {
+        "id": "C06", "categoria": "chasis", "critico": False,
+        "item": "Fugas en sistema de transmision",
+        "detalle": "Buscar manchas de aceite en la caja de cambios, diferencial y transmision. Las fugas indican sellos danados.",
+    },
+    {
+        "id": "C07", "categoria": "chasis", "critico": False,
+        "item": "Estado de los semiaxes y juntas homoceticas",
+        "detalle": "Verificar que los fuelles de las juntas homoceticas no esten rotos. Un fuelle roto provoca contaminacion y fallo de la junta.",
+    },
+
+    # ── PRUEBA DE MANEJO ──────────────────────────────────────────────────────
+    {
+        "id": "P01", "categoria": "prueba_manejo", "critico": False,
+        "item": "Arranque en frio (sin precalentar)",
+        "detalle": "El motor debe arrancar a la primera. Un arranque dificultoso indica bateria debil, bujias gastadas o problema en el sistema de combustible.",
+    },
+    {
+        "id": "P02", "categoria": "prueba_manejo", "critico": True,
+        "item": "El vehiculo no jala hacia un lado",
+        "detalle": "En una recta con manos sueltas del volante, el vehiculo no debe desviarse. Si jala, hay problema de alineacion o frenos.",
+    },
+    {
+        "id": "P03", "categoria": "prueba_manejo", "critico": True,
+        "item": "Frenos responden firmes y sin ruidos",
+        "detalle": "El pedal debe estar firme (no esponjoso). Frenada recta sin vibrar. Ruidos al frenar indican discos o pastillas en mal estado.",
+    },
+    {
+        "id": "P04", "categoria": "prueba_manejo", "critico": False,
+        "item": "Cambios de marcha suaves (caja manual o automatica)",
+        "detalle": "Los cambios no deben ser bruscos ni rechinar. La caja automatica no debe demorar o dar tirones al cambiar.",
+    },
+    {
+        "id": "P05", "categoria": "prueba_manejo", "critico": False,
+        "item": "Aceleracion progresiva sin tirones",
+        "detalle": "El motor debe responder uniformemente. Tirones o 'sacudidas' indican bujias, inyectores o sensores defectuosos.",
+    },
+    {
+        "id": "P06", "categoria": "prueba_manejo", "critico": False,
+        "item": "Sin ruidos de suspension en baches o curvas",
+        "detalle": "Golpes metalicos sobre baches = rotulas o bujes gastados. Ruidos al girar = juntas homoceticas o cojinetes de rueda danados.",
+    },
+    {
+        "id": "P07", "categoria": "prueba_manejo", "critico": False,
+        "item": "Temperatura del motor se estabiliza durante el recorrido",
+        "detalle": "Durante la prueba (minimo 15 min), vigilar el indicador de temperatura. No debe pasar del centro.",
+    },
+    {
+        "id": "P08", "categoria": "prueba_manejo", "critico": False,
+        "item": "Sin vibraciones en el volante a alta velocidad",
+        "detalle": "Vibraciones a mas de 80 km/h indican llantas desbalanceadas o problema de geometria de direccion.",
+    },
+]
+
+
+def obtener_por_categoria(categoria):
+    """Retorna los items de una categoria especifica."""
+    return [i for i in CHECKLIST if i["categoria"] == categoria]
+
+
+def obtener_criticos():
+    """Retorna solo los items criticos."""
+    return [i for i in CHECKLIST if i["critico"]]
+
+
+NOMBRES_CATEGORIA = {
+    "exterior"      : "Exterior y Carroceria",
+    "interior"      : "Interior y Electronica",
+    "motor"         : "Motor y Compartimiento",
+    "chasis"        : "Chasis y Parte Inferior",
+    "prueba_manejo" : "Prueba de Manejo",
+}
+
+ICONOS_CATEGORIA = {
+    "exterior"      : "🚗",
+    "interior"      : "🪑",
+    "motor"         : "🔧",
+    "chasis"        : "⚙️",
+    "prueba_manejo" : "🏁",
+}
+
+"""
+recomendaciones.py -- Motor de recomendaciones finales.
+Analiza los resultados de scraping + checklist y genera un veredicto.
+"""
+
+
+NIVELES = {
+    "COMPRAR":       {"color": "#276749", "bg": "#f0fff4", "border": "#68d391", "icono": "✅"},
+    "NEGOCIAR":      {"color": "#744210", "bg": "#fffbeb", "border": "#f6ad55", "icono": "⚠️"},
+    "REVISAR_TALLER":{"color": "#744210", "bg": "#fffbeb", "border": "#f6ad55", "icono": "🔧"},
+    "NO_COMPRAR":    {"color": "#742a2a", "bg": "#fff5f5", "border": "#fc8181", "icono": "🚨"},
+}
+
+
+def generar(resultados_scraping, respuestas_checklist=None):
+    """
+    Genera el reporte de recomendaciones.
+
+    Args:
+        resultados_scraping : Lista de ResultadoConsulta de todos los bloques.
+        respuestas_checklist: Dict {id_item: "ok" | "falla" | "no_revisado"}
+                              Si es None, se omite el analisis del checklist.
+    Returns:
+        Dict con veredicto, puntuacion, razones y recomendaciones_lista.
+    """
+    respuestas = respuestas_checklist or {}
+
+    puntos_negativos  = 0
+    puntos_positivos  = 0
+    razones_rechazo   = []
+    razones_atencion  = []
+    puntos_favor      = []
+    recomendaciones   = []
+
+    # ── Analisis de resultados de scraping ────────────────────────────────────
+    for r in resultados_scraping:
+        fuente = r.fuente
+        datos  = r.datos or {}
+        msg    = r.mensaje or ""
+
+        if r.estado == "advertencia":
+            puntos_negativos += 2
+
+            # SOAT vencido
+            if "soat" in fuente.lower() and "vencido" in msg.lower():
+                razones_rechazo.append("El SOAT esta VENCIDO. El vehiculo no puede circular legalmente.")
+                recomendaciones.append("Exige al vendedor renovar el SOAT antes de cerrar el trato o descuenta el costo del precio.")
+
+            # Infracciones SUTRAN
+            elif "sutran" in fuente.lower():
+                total = datos.get("total", "?")
+                razones_atencion.append("El vehiculo tiene {} infraccion(es) en SUTRAN.".format(total))
+                recomendaciones.append("Verifica con el vendedor quien pagara las papeletas SUTRAN pendientes. Descuenta el monto del precio.")
+
+            # Multas ATU
+            elif "atu" in fuente.lower():
+                total = datos.get("total", "?")
+                razones_atencion.append("{} multa(s) pendiente(s) en ATU.".format(total))
+                recomendaciones.append("Solicita al vendedor cancelar las multas ATU antes de la transferencia.")
+
+            # Papeletas regionales
+            elif "papeletas" in fuente.lower():
+                ciudad = datos.get("Ciudad", fuente.replace("Papeletas --", "").strip())
+                total = datos.get("total", "?")
+                razones_atencion.append("Papeleta(s) pendiente(s) en {}: {} multa(s).".format(ciudad, total))
+                recomendaciones.append("Negocia el descuento del valor de las papeletas de {} en el precio final.".format(ciudad))
+
+            # Accidentes SBS
+            elif "sbs" in fuente.lower() or "accidente" in fuente.lower():
+                num = datos.get("Accidentes en ultimos 5 anos", datos.get("Accidentes en últimos 5 años", "?"))
+                razones_atencion.append("El vehiculo registra {} siniestro(s) SOAT en los ultimos 5 anos.".format(num))
+                recomendaciones.append("Solicita el historial tecnico del vehiculo y exige inspeccion en taller de confianza.")
+
+            # SUNARP SPRL -- alerta legal
+            elif "sprl" in fuente.lower():
+                if "embargo" in msg.lower():
+                    razones_rechazo.append("ALERTA: El vehiculo tiene EMBARGO registrado en SUNARP. NO transferible hasta levantar la medida.")
+                    puntos_negativos += 5
+                elif "prescripcion" in msg.lower():
+                    razones_rechazo.append("ALERTA: Se detecta PRESCRIPCION DE DOMINIO en SUNARP. Consulta a un abogado.")
+                    puntos_negativos += 5
+                else:
+                    razones_atencion.append("Hay anotaciones en SUNARP SPRL. Revisa con un abogado antes de firmar.")
+
+            # GNV FISE
+            elif "gnv" in fuente.lower() or "fise" in fuente.lower():
+                razones_atencion.append("El vehiculo tiene deuda de GNV en FISE.")
+                recomendaciones.append("Solicita al vendedor cancelar la deuda GNV antes de la transferencia.")
+
+            # Callao
+            elif "callao" in fuente.lower():
+                razones_atencion.append("Papeleta(s) pendiente(s) en el Callao.")
+                recomendaciones.append("Descuenta el valor de las papeletas del Callao del precio.")
+
+            else:
+                razones_atencion.append("Advertencia en {}: {}".format(fuente, msg[:100]))
+
+        elif r.estado == "ok":
+            puntos_positivos += 1
+            if "soat" in fuente.lower():
+                estado_soat = datos.get("Estado", datos.get("estado", "")).lower()
+                if "vigente" in estado_soat:
+                    puntos_favor.append("SOAT vigente.")
+            elif "inspeccion" in fuente.lower() or "itv" in fuente.lower() or "mtc" in fuente.lower():
+                puntos_favor.append("Inspeccion Tecnica Vehicular al dia.")
+            elif "sutran" in fuente.lower():
+                puntos_favor.append("Sin infracciones en SUTRAN.")
+            elif "atu" in fuente.lower():
+                puntos_favor.append("Sin multas en ATU.")
+            elif "sbs" in fuente.lower():
+                puntos_favor.append("Sin accidentes SOAT registrados.")
+
+        elif r.estado == "error":
+            # Errores de scraping no son fallas del vehiculo -- solo informamos
+            pass
+
+    # ── Analisis del checklist ────────────────────────────────────────────────
+    if respuestas:
+        from inspeccion.checklist import CHECKLIST
+        criticos_fallidos = []
+        items_fallidos    = []
+
+        for item in CHECKLIST:
+            estado_item = respuestas.get(item["id"], "no_revisado")
+            if estado_item == "falla":
+                if item["critico"]:
+                    criticos_fallidos.append(item["item"])
+                    puntos_negativos += 3
+                else:
+                    items_fallidos.append(item["item"])
+                    puntos_negativos += 1
+            elif estado_item == "ok":
+                puntos_positivos += 1
+
+        if criticos_fallidos:
+            razones_rechazo.extend(["FALLA CRITICA: " + i for i in criticos_fallidos])
+            recomendaciones.append(
+                "Los items criticos fallidos son problemas graves. Rechaza el vehiculo o exige reparacion documentada antes de comprar."
+            )
+
+        if items_fallidos:
+            razones_atencion.extend(items_fallidos)
+            if items_fallidos:
+                recomendaciones.append(
+                    "Cotiza la reparacion de los items con falla y descuenta ese monto del precio negociado."
+                )
+
+    # ── Recomendaciones generales siempre presentes ───────────────────────────
+    recomendaciones.append("Verifica que la placa y VIN del vehiculo coincidan con la Tarjeta de Propiedad (TIVE).")
+    recomendaciones.append("Firma el contrato de compraventa ante notario y realiza la transferencia en SUNARP el mismo dia.")
+    recomendaciones.append("Solicita facturas de mantenimiento o historial de servicio del vehiculo.")
+    recomendaciones.append("Contrata una revision tecnica en taller independiente antes de cerrar el trato (costo: S/ 100 - S/ 200).")
+
+    # ── Veredicto final ───────────────────────────────────────────────────────
+    if razones_rechazo:
+        veredicto = "NO_COMPRAR"
+    elif puntos_negativos >= 6:
+        veredicto = "NO_COMPRAR"
+    elif puntos_negativos >= 3:
+        veredicto = "REVISAR_TALLER"
+    elif puntos_negativos >= 1:
+        veredicto = "NEGOCIAR"
+    else:
+        veredicto = "COMPRAR"
+
+    nivel = NIVELES[veredicto]
+
+    return {
+        "veredicto"         : veredicto,
+        "etiqueta"          : {
+            "COMPRAR"       : "APTO PARA COMPRAR",
+            "NEGOCIAR"      : "NEGOCIAR PRECIO",
+            "REVISAR_TALLER": "REVISAR EN TALLER",
+            "NO_COMPRAR"    : "NO RECOMENDADO",
+        }[veredicto],
+        "color"             : nivel["color"],
+        "bg"                : nivel["bg"],
+        "border"            : nivel["border"],
+        "icono"             : nivel["icono"],
+        "puntos_negativos"  : puntos_negativos,
+        "puntos_positivos"  : puntos_positivos,
+        "razones_rechazo"   : razones_rechazo,
+        "razones_atencion"  : razones_atencion,
+        "puntos_favor"      : puntos_favor,
+        "recomendaciones"   : list(dict.fromkeys(recomendaciones)),  # deduplicar
+    }
+
+
+"""
+generator.py -- Genera el reporte HTML a partir de los resultados.
+"""
+import os
+from datetime import datetime
+from pathlib import Path
+from typing import List
+from jinja2 import Environment, FileSystemLoader
+from scrapers.base import ResultadoConsulta
+
+TEMPLATES_DIR = Path(__file__).parent / "templates"
+
+
+def generar_reporte(
+    placa,
+    resultados_doc,
+    resultados_deudas,
+    resultados_regiones=None,
+    ruta_salida=None
+):
+    resultados_regiones = resultados_regiones or []
+
+    env = Environment(loader=FileSystemLoader(str(TEMPLATES_DIR)))
+    template = env.get_template("reporte.html")
+
+    todos = resultados_doc + resultados_deudas + resultados_regiones
+    conteo = {
+        "ok"         : sum(1 for r in todos if r.estado == "ok"),
+        "advertencia": sum(1 for r in todos if r.estado == "advertencia"),
+        "error"      : sum(1 for r in todos if r.estado == "error"),
+        "sin_datos"  : sum(1 for r in todos if r.estado == "sin_datos"),
+        "total"      : len(todos),
+    }
+
+    html = template.render(
+        placa=placa.upper(),
+        fecha=datetime.now().strftime("%d/%m/%Y %H:%M"),
+        resultados_doc=resultados_doc,
+        resultados_deudas=resultados_deudas,
+        resultados_regiones=resultados_regiones,
+        conteo=conteo,
+    )
+
+    if not ruta_salida:
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        ruta_salida = os.path.join(
+            os.path.dirname(__file__), "..", "reportes",
+            "reporte_{}_{}.html".format(placa.upper(), ts)
+        )
+
+    os.makedirs(os.path.dirname(ruta_salida), exist_ok=True)
+
+    with open(ruta_salida, "w", encoding="utf-8") as f:
+        f.write(html)
+
+    return os.path.abspath(ruta_salida)
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Reporte Vehicular — {{ placa }}</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', Arial, sans-serif; background: #f0f4f8; color: #1a202c; font-size: 14px; line-height: 1.6; }
+    a { color: #2b6cb0; }
+    :root {
+      --ok: #276749; --ok-bg: #f0fff4; --ok-border: #68d391;
+      --warn: #744210; --warn-bg: #fffbeb; --warn-border: #f6ad55;
+      --error: #742a2a; --error-bg: #fff5f5; --error-border: #fc8181;
+      --neutral: #2d3748; --neutral-bg: #edf2f7; --neutral-border: #a0aec0;
+      --accent: #2b6cb0;
+    }
+
+    /* Header */
+    header { background: linear-gradient(135deg, #1a365d 0%, #2b6cb0 100%); color: white; padding: 28px 40px; display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
+    header .logo-area h1 { font-size: 24px; font-weight: 700; }
+    header .logo-area p { font-size: 12px; opacity: 0.85; margin-top: 4px; }
+    .placa-badge { background: rgba(255,255,255,0.15); border: 2px solid rgba(255,255,255,0.4); border-radius: 12px; padding: 10px 24px; text-align: center; }
+    .placa-badge .label { font-size: 10px; opacity: 0.8; text-transform: uppercase; letter-spacing: 1px; }
+    .placa-badge .placa { font-size: 28px; font-weight: 900; letter-spacing: 4px; margin-top: 2px; }
+    header .fecha { font-size: 11px; opacity: 0.75; text-align: right; }
+
+    /* Layout */
+    main { max-width: 980px; margin: 28px auto; padding: 0 16px 60px; }
+
+    /* Resumen ejecutivo */
+    .resumen { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px; margin-bottom: 28px; }
+    .resumen-card { background: white; border-radius: 10px; padding: 16px 12px; text-align: center; box-shadow: 0 1px 4px rgba(0,0,0,0.08); border-top: 4px solid var(--accent); }
+    .resumen-card .numero { font-size: 32px; font-weight: 800; line-height: 1; }
+    .resumen-card .etiqueta { font-size: 10px; color: #718096; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 5px; }
+    .resumen-card.ok { border-color: var(--ok-border); } .resumen-card.ok .numero { color: var(--ok); }
+    .resumen-card.warn { border-color: var(--warn-border); } .resumen-card.warn .numero { color: var(--warn); }
+    .resumen-card.error { border-color: var(--error-border); } .resumen-card.error .numero { color: var(--error); }
+
+    /* Grupos / Secciones */
+    section.grupo { margin-bottom: 28px; }
+    .grupo-titulo { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #4a5568; border-bottom: 2px solid #e2e8f0; padding-bottom: 7px; margin-bottom: 14px; }
+
+    /* Tarjeta de consulta */
+    .consulta-card { background: white; border-radius: 10px; border-left: 5px solid var(--neutral-border); box-shadow: 0 1px 4px rgba(0,0,0,0.06); margin-bottom: 12px; overflow: hidden; }
+    .consulta-card.ok          { border-left-color: var(--ok-border); }
+    .consulta-card.advertencia { border-left-color: var(--warn-border); }
+    .consulta-card.error       { border-left-color: var(--error-border); }
+    .consulta-card.sin_datos   { border-left-color: var(--neutral-border); }
+
+    .card-header { display: flex; align-items: center; gap: 10px; padding: 12px 18px; cursor: pointer; user-select: none; }
+    .estado-badge { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; padding: 3px 9px; border-radius: 20px; white-space: nowrap; }
+    .ok .estado-badge          { background: var(--ok-bg);      color: var(--ok);      border: 1px solid var(--ok-border); }
+    .advertencia .estado-badge { background: var(--warn-bg);    color: var(--warn);    border: 1px solid var(--warn-border); }
+    .error .estado-badge       { background: var(--error-bg);   color: var(--error);   border: 1px solid var(--error-border); }
+    .sin_datos .estado-badge   { background: var(--neutral-bg); color: var(--neutral); border: 1px solid var(--neutral-border); }
+
+    .card-header .fuente { font-weight: 600; font-size: 14px; flex: 1; }
+    .card-header .url { font-size: 10px; color: #718096; }
+    .card-header .toggle { font-size: 16px; color: #a0aec0; }
+
+    .card-body { padding: 0 18px 14px; border-top: 1px solid #edf2f7; }
+
+    /* Tablas de datos */
+    .datos-tabla { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    .datos-tabla tr:nth-child(even) { background: #f7fafc; }
+    .datos-tabla td { padding: 7px 10px; font-size: 13px; border-bottom: 1px solid #edf2f7; }
+    .datos-tabla td:first-child { font-weight: 600; color: #4a5568; width: 38%; }
+
+    .infracciones-tabla { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12px; }
+    .infracciones-tabla th { background: #2d3748; color: white; padding: 7px 9px; text-align: left; font-weight: 600; }
+    .infracciones-tabla td { padding: 6px 9px; border-bottom: 1px solid #edf2f7; }
+    .infracciones-tabla tr:nth-child(even) td { background: #fff8f0; }
+
+    /* Alertas */
+    .mensaje-alerta { margin-top: 9px; padding: 9px 12px; border-radius: 7px; font-size: 13px; font-weight: 500; }
+    .ok .mensaje-alerta          { background: var(--ok-bg);      color: var(--ok); }
+    .advertencia .mensaje-alerta { background: var(--warn-bg);    color: var(--warn); }
+    .error .mensaje-alerta       { background: var(--error-bg);   color: var(--error); }
+    .sin_datos .mensaje-alerta   { background: var(--neutral-bg); color: var(--neutral); }
+
+    /* Grid para papeletas regionales (2 columnas) */
+    .grid-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    @media (max-width: 680px) { .grid-2col { grid-template-columns: 1fr; } }
+
+    /* Botón PDF */
+    .btn-pdf { position: fixed; bottom: 24px; right: 24px; background: var(--accent); color: white; border: none; border-radius: 50px; padding: 12px 22px; font-size: 14px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 14px rgba(43,108,176,0.4); }
+    .btn-pdf:hover { background: #2c5282; }
+
+    footer { text-align: center; color: #a0aec0; font-size: 11px; padding: 18px; margin-top: 32px; border-top: 1px solid #e2e8f0; }
+
+    @media print {
+      body { background: white; }
+      .btn-pdf { display: none; }
+      header { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+      .consulta-card, .grid-2col > div { break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── HEADER ────────────────────────────────────────────────────────────── -->
+<header>
+  <div class="logo-area">
+    <h1>🚗 Verificador Vehicular — Perú</h1>
+    <p>Consulta integral antes de comprar un vehículo usado</p>
+  </div>
+  <div class="placa-badge">
+    <div class="label">Placa consultada</div>
+    <div class="placa">{{ placa }}</div>
+  </div>
+  <div class="fecha">Generado el<br><strong>{{ fecha }}</strong></div>
+</header>
+
+<!-- ── MAIN ───────────────────────────────────────────────────────────────── -->
+<main>
+
+  <!-- Resumen ejecutivo -->
+  <div class="resumen">
+    <div class="resumen-card ok">
+      <div class="numero">{{ conteo.ok }}</div>
+      <div class="etiqueta">✅ Sin problemas</div>
+    </div>
+    <div class="resumen-card warn">
+      <div class="numero">{{ conteo.advertencia }}</div>
+      <div class="etiqueta">⚠️ Advertencias</div>
+    </div>
+    <div class="resumen-card error">
+      <div class="numero">{{ conteo.error }}</div>
+      <div class="etiqueta">🚨 Errores</div>
+    </div>
+    <div class="resumen-card">
+      <div class="numero" style="color:#718096">{{ conteo.sin_datos }}</div>
+      <div class="etiqueta">ℹ️ Sin datos</div>
+    </div>
+    <div class="resumen-card">
+      <div class="numero" style="color:#2b6cb0">{{ conteo.total }}</div>
+      <div class="etiqueta">📊 Total consul.</div>
+    </div>
+  </div>
+
+  <!-- ── Macro para renderizar una tarjeta ─────────────────────────────── -->
+  {% macro tarjeta(r) %}
+  <div class="consulta-card {{ r.estado }}">
+    <div class="card-header" onclick="toggleCard(this)">
+      <span class="estado-badge">
+        {% if r.estado == 'ok' %}✅ OK
+        {% elif r.estado == 'advertencia' %}⚠️ ADVERTENCIA
+        {% elif r.estado == 'error' %}🚨 ERROR
+        {% else %}ℹ️ SIN DATOS{% endif %}
+      </span>
+      <span class="fuente">{{ r.fuente }}</span>
+      <span class="url"><a href="{{ r.url }}" target="_blank">{{ r.url }}</a></span>
+      <span class="toggle">▾</span>
+    </div>
+    <div class="card-body">
+      {% set lista = r.datos.get('infracciones') or r.datos.get('multas') or r.datos.get('papeletas') %}
+      {% if lista is not none %}
+        {% if lista | length == 0 %}
+          <p style="color:var(--ok);font-weight:600;margin-top:10px;">✅ Sin registros.</p>
+        {% else %}
+          <table class="infracciones-tabla">
+            <thead><tr>{% for k in lista[0].keys() %}<th>{{ k }}</th>{% endfor %}</tr></thead>
+            <tbody>{% for item in lista %}<tr>{% for v in item.values() %}<td>{{ v }}</td>{% endfor %}</tr>{% endfor %}</tbody>
+          </table>
+        {% endif %}
+      {% elif r.datos %}
+        <table class="datos-tabla">
+          {% for clave, valor in r.datos.items() %}
+          {% if clave not in ['infracciones','multas','papeletas','resumen','total'] %}
+          <tr><td>{{ clave }}</td><td>{{ valor }}</td></tr>
+          {% endif %}
+          {% endfor %}
+        </table>
+      {% endif %}
+      {% if r.mensaje %}<div class="mensaje-alerta">{{ r.mensaje }}</div>{% endif %}
+    </div>
+  </div>
+  {% endmacro %}
+
+  <!-- ── BLOQUE 1: Documentación ──────────────────────────────────────── -->
+  <section class="grupo">
+    <div class="grupo-titulo">📋 Bloque 1 — Documentación del Vehículo</div>
+    {% for r in resultados_doc %}{{ tarjeta(r) }}{% endfor %}
+  </section>
+
+  <!-- ── BLOQUE 2: Deudas e Infracciones ──────────────────────────────── -->
+  <section class="grupo">
+    <div class="grupo-titulo">🚦 Bloque 2 — Deudas e Infracciones</div>
+    {% for r in resultados_deudas %}{{ tarjeta(r) }}{% endfor %}
+  </section>
+
+  <!-- ── BLOQUE 3: Papeletas Regionales ───────────────────────────────── -->
+  {% if resultados_regiones %}
+  <section class="grupo">
+    <div class="grupo-titulo">📍 Bloque 3 — Papeletas Regionales</div>
+    <div class="grid-2col">
+      {% for r in resultados_regiones %}{{ tarjeta(r) }}{% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+</main>
+
+<footer>
+  Reporte generado automáticamente | Verificador Vehicular Perú | {{ fecha }}<br>
+  Fuentes: SUNARP · APESEG · MTC · SUTRAN · ATU · SBS · FISE · SATs municipales
+</footer>
+
+<button class="btn-pdf" onclick="window.print()">🖨️ Exportar PDF</button>
+
+<script>
+  function toggleCard(header) {
+    const body = header.nextElementSibling;
+    const toggle = header.querySelector('.toggle');
+    const hidden = body.style.display === 'none';
+    body.style.display = hidden ? 'block' : 'none';
+    toggle.textContent = hidden ? '▾' : '▸';
+  }
+</script>
+</body>
+</html>
+
+
+"""
+arequipa.py — Papeletas Municipalidad de Arequipa.
+URL: https://www.muniarequipa.gob.pe/oficina-virtual/c0nInfrPermisos/faltas/papeletas.php
+"""
+from playwright.async_api import Page
+from config import URLS
+from scrapers.papeleta_base import consultar_papeleta
+
+async def consultar(page: Page, placa: str):
+    return await consultar_papeleta(
+        page=page, url=URLS["arequipa"], ciudad="Arequipa", placa=placa,
+        selector_placa=(
+            "input[id*='plac' i], input[name*='plac' i], "
+            "input[placeholder*='plac' i], input[type='text']"
+        ),
+        espera_extra=2.5,
+    )
+
+"""
+atu.py — Consulta de multas ATU por placa.
+URL: https://pasarela.atu.gob.pe/
+
+Extrae: Listado de multas (número, descripción, monto, estado).
+"""
+import asyncio
+from playwright.async_api import Page, TimeoutError as PWTimeout
+from config import URLS, TIMEOUT
+from scrapers.base import ResultadoConsulta
+
+
+async def consultar(page: Page, placa: str) -> ResultadoConsulta:
+    resultado = ResultadoConsulta(
+        fuente="ATU — Multas de Transporte Urbano",
+        url=URLS["atu"]
+    )
+
+    try:
+        await page.goto(URLS["atu"], timeout=TIMEOUT, wait_until="domcontentloaded")
+        await asyncio.sleep(3)  # ATU usa React/SPA — necesita más tiempo
+
+        # ATU tiene una SPA (Single Page App), buscar campo de placa
+        campo = page.locator(
+            "input[placeholder*='placa' i], input[id*='placa' i], "
+            "input[name*='placa' i], input[type='text']"
+        )
+        await campo.first.wait_for(state="visible", timeout=TIMEOUT)
+        await campo.first.fill(placa.upper().strip())
+
+        # Botón buscar
+        btn = page.locator(
+            "button:has-text('Buscar'), button:has-text('Consultar'), "
+            "button[type='submit'], input[type='submit']"
+        )
+        await btn.first.click()
+        await asyncio.sleep(4)  # Esperar respuesta API interna
+
+        # Esperar resultado
+        await page.wait_for_selector(
+            "table, .resultado, .multa-item, .card, .alert, "
+            "p:has-text('No'), div:has-text('sin multas')",
+            timeout=TIMEOUT
+        )
+
+        # Verificar sin multas
+        texto_pagina = (await page.content()).lower()
+        palabras_sin_multa = [
+            "no tiene multas", "sin multas", "no registra multas",
+            "no se encontraron", "no hay multas"
+        ]
+        if any(p in texto_pagina for p in palabras_sin_multa):
+            resultado.marcar_ok({"multas": [], "resumen": "✅ Sin multas ATU registradas"})
+            return resultado
+
+        # Extraer multas de la tabla
+        multas = []
+        filas = await page.locator("table tbody tr, .multa-row, .resultado-item").all()
+
+        for fila in filas:
+            texto = await fila.inner_text()
+            if texto.strip():
+                celdas = await fila.locator("td, .col").all()
+                valores = [(await c.inner_text()).strip() for c in celdas if (await c.inner_text()).strip()]
+                if valores:
+                    multas.append({"detalle": " | ".join(valores)})
+
+        # Obtener headers
+        headers = []
+        ths = await page.locator("table thead th").all()
+        for th in ths:
+            h = (await th.inner_text()).strip()
+            if h:
+                headers.append(h)
+
+        if multas:
+            resultado.marcar_advertencia(
+                {"multas": multas, "total": len(multas)},
+                f"⚠️ Se encontraron {len(multas)} multa(s) en ATU."
+            )
+        else:
+            resultado.marcar_ok({"multas": [], "resumen": "✅ Sin multas ATU registradas"})
+
+    except PWTimeout:
+        resultado.marcar_error("Tiempo de espera agotado al consultar ATU.")
+    except Exception as exc:
+        resultado.marcar_error(f"Error inesperado: {exc}")
+
+    return resultado
+
+"""
+base.py — Clase base para todos los scrapers.
+Define la interfaz común y manejo de errores.
+"""
+from dataclasses import dataclass, field
+from typing import Any, Dict, Optional
+
+
+@dataclass
+class ResultadoConsulta:
+    """Contenedor estandarizado para el resultado de cada consulta."""
+    fuente: str                          # Nombre legible del sitio
+    url: str                             # URL consultada
+    estado: str = "pendiente"            # ok | advertencia | error | sin_datos
+    datos: Dict[str, Any] = field(default_factory=dict)
+    mensaje: Optional[str] = None        # Mensaje de error o nota adicional
+
+    def marcar_ok(self, datos: Dict[str, Any]):
+        self.estado = "ok"
+        self.datos = datos
+
+    def marcar_advertencia(self, datos: Dict[str, Any], mensaje: str):
+        self.estado = "advertencia"
+        self.datos = datos
+        self.mensaje = mensaje
+
+    def marcar_error(self, mensaje: str):
+        self.estado = "error"
+        self.mensaje = mensaje
+
+    def marcar_sin_datos(self, mensaje: str = "Sin información disponible"):
+        self.estado = "sin_datos"
+        self.mensaje = mensaje
+
+"""
+cajamarca.py — Papeletas SAT Cajamarca.
+URL: https://www.satcajamarca.gob.pe/#/
+El portal usa Angular (SPA) — requiere más tiempo de carga.
+"""
+from playwright.async_api import Page
+from config import URLS
+from scrapers.papeleta_base import consultar_papeleta
+
+async def consultar(page: Page, placa: str):
+    return await consultar_papeleta(
+        page=page, url=URLS["cajamarca"], ciudad="Cajamarca (SAT)", placa=placa,
+        selector_placa=(
+            "input[placeholder*='plac' i], input[id*='plac' i], "
+            "input[ng-model*='plac' i], input[type='text']"
+        ),
+        espera_extra=4.0,  # Angular SPA necesita más tiempo
+    )
+
+"""
+callao.py — Papeletas Municipalidad del Callao.
+URL: https://pagopapeletascallao.pe/
+
+El portal del Callao puede requerir un código de seguridad (captcha visual).
+Se ejecuta en modo visible para que el usuario lo resuelva manualmente.
+"""
+import asyncio
+from playwright.async_api import Page, TimeoutError as PWTimeout
+from config import URLS, TIMEOUT
+from scrapers.papeleta_base import consultar_papeleta
+
+
+async def consultar(page: Page, placa: str):
+    return await consultar_papeleta(
+        page=page,
+        url=URLS["callao"],
+        ciudad="Callao",
+        placa=placa,
+        selector_placa=(
+            "input[id*='plac' i], input[name*='plac' i], "
+            "input[placeholder*='plac' i], input[type='text']"
+        ),
+        selector_buscar=(
+            "button:has-text('Consultar'), button:has-text('Buscar'), "
+            "input[type='submit'], button[type='submit']"
+        ),
+        espera_extra=3.0,  # El Callao tarda un poco más
+    )
+
+"""
+chachapoyas.py — Papeletas Municipalidad de Chachapoyas.
+URL: https://app.munichachapoyas.gob.pe/servicios/consulta_papeletas/app/papeletas.php
+"""
+from playwright.async_api import Page
+from config import URLS
+from scrapers.papeleta_base import consultar_papeleta
+
+async def consultar(page: Page, placa: str):
+    return await consultar_papeleta(
+        page=page, url=URLS["chachapoyas"], ciudad="Chachapoyas", placa=placa,
+        selector_placa="input[name*='plac' i], input[id*='plac' i], input[name='NRO_PLACA'], input[type='text']",
+        espera_extra=2.0,
+    )
+
+"""
+chiclayo.py — Papeletas SAT Chiclayo.
+URL: https://virtualsatch.satch.gob.pe/virtualsatch/record_infracciones/buscar_placa_
+"""
+from playwright.async_api import Page
+from config import URLS
+from scrapers.papeleta_base import consultar_papeleta
+
+async def consultar(page: Page, placa: str):
+    return await consultar_papeleta(
+        page=page, url=URLS["chiclayo"], ciudad="Chiclayo (SAT)", placa=placa,
+        espera_extra=2.0,
+    )
+
+"""
+gnv_fise.py — Consulta de deuda de gas GNV en FISE/MINEM.
+URL: https://fise.minem.gob.pe:23308/consulta-taller/pages/consultaTaller/inicio
+
+Extrae: si el vehículo tiene deuda GNV pendiente o no tiene información.
+"""
+import asyncio
+from playwright.async_api import Page, TimeoutError as PWTimeout
+from config import URLS, TIMEOUT
+from scrapers.base import ResultadoConsulta
+
+
+async def consultar(page: Page, placa: str) -> ResultadoConsulta:
+    resultado = ResultadoConsulta(
+        fuente="FISE/MINEM — Deuda Gas GNV",
+        url=URLS["gnv_fise"]
+    )
+
+    try:
+        await page.goto(URLS["gnv_fise"], timeout=TIMEOUT, wait_until="domcontentloaded")
+        await asyncio.sleep(3)  # Portal GNV suele ser lento
+
+        # Campo placa
+        campo = page.locator(
+            "input[id*='plac' i], input[name*='plac' i], "
+            "input[placeholder*='plac' i], input[type='text']"
+        )
+        await campo.first.wait_for(state="visible", timeout=TIMEOUT)
+        await campo.first.fill(placa.upper().strip())
+
+        # Botón buscar
+        btn = page.locator(
+            "button:has-text('Consultar'), button:has-text('Buscar'), "
+            "input[type='submit'], button[type='submit']"
+        )
+        await btn.first.click()
+        await asyncio.sleep(4)
+
+        # Esperar resultado
+        try:
+            await page.wait_for_selector(
+                "table, .resultado, .alert, .mensaje, p, div.content",
+                timeout=TIMEOUT
+            )
+        except PWTimeout:
+            pass
+
+        texto = (await page.locator("body").inner_text()).lower()
+
+        # Determinar estado
+        if any(p in texto for p in ["no existe", "no registra", "sin deuda", "no tiene deuda", "no se encontró"]):
+            resultado.marcar_ok({
+                "Estado GNV": "Sin deuda registrada",
+                "Resumen": "✅ El vehículo no tiene deuda GNV en FISE."
+            })
+        elif any(p in texto for p in ["deuda", "monto", "pendiente", "saldo"]):
+            # Extraer monto si está disponible
+            datos = {"Estado GNV": "Posible deuda detectada"}
+            filas = await page.locator("table tr").all()
+            for fila in filas:
+                texto_fila = await fila.inner_text()
+                partes = [p.strip() for p in texto_fila.split("\n") if p.strip()]
+                if len(partes) >= 2:
+                    datos[partes[0].rstrip(":")] = " ".join(partes[1:])
+            resultado.marcar_advertencia(
+                datos,
+                "⚠️ Se detectó deuda GNV en FISE. Verifica el monto antes de comprar."
+            )
+        else:
+            resultado.marcar_sin_datos(
+                "No se encontró información de GNV para esta placa. "
+                "Es posible que el vehículo no esté registrado con GNV."
+            )
+
+    except PWTimeout:
+        resultado.marcar_error("Tiempo de espera agotado al consultar FISE GNV.")
+    except Exception as exc:
+        resultado.marcar_error(f"Error en FISE GNV: {exc}")
+
+    return resultado
+
+"""
+huancayo.py — Papeletas SAT Huancayo.
+URL: http://sathuancayo.fortiddns.com:888/VentanillaVirtual/ConsultaPIT.aspx
+"""
+from playwright.async_api import Page
+from config import URLS
+from scrapers.papeleta_base import consultar_papeleta
+
+async def consultar(page: Page, placa: str):
+    return await consultar_papeleta(
+        page=page, url=URLS["huancayo"], ciudad="Huancayo (SAT)", placa=placa,
+        espera_extra=3.0,
+    )
+
+"""
+ica.py — Papeletas SAT Ica.
+URL: https://m.satica.gob.pe/consultapapeletas.php
+Proceso: Seleccionar "PAPELETAS" → ingresar placa → buscar.
+"""
+import asyncio
+from playwright.async_api import Page, TimeoutError as PWTimeout
+from config import URLS, TIMEOUT
+from scrapers.papeleta_base import consultar_papeleta
+
+async def consultar(page: Page, placa: str):
+    # El portal de Ica puede tener un menú previo para seleccionar "Papeletas"
+    resultado = await consultar_papeleta(
+        page=page, url=URLS["ica"], ciudad="Ica (SAT)", placa=placa,
+        selector_buscar=(
+            "button:has-text('Consultar'), button:has-text('Buscar'), "
+            "input[type='submit'], button[type='submit']"
+        ),
+        espera_extra=3.0,
+    )
+    return resultado
+
+"""
+mtc_inspeccion.py — Consulta de Inspección Técnica Vehicular en MTC.
+URL: https://rec.mtc.gob.pe/Citv/ArConsultaCitv
+
+Extrae: Estado de inspección, Fecha inicio, Fecha fin (vigencia).
+"""
+import asyncio
+from playwright.async_api import Page, TimeoutError as PWTimeout
+from config import URLS, TIMEOUT
+from scrapers.base import ResultadoConsulta
+
+
+async def consultar(page: Page, placa: str) -> ResultadoConsulta:
+    resultado = ResultadoConsulta(
+        fuente="MTC — Inspección Técnica Vehicular (ITV)",
+        url=URLS["mtc_inspeccion"]
+    )
+
+    try:
+        await page.goto(URLS["mtc_inspeccion"], timeout=TIMEOUT, wait_until="domcontentloaded")
+        await asyncio.sleep(2)
+
+        # Campo placa
+        campo = page.locator(
+            "input[id*='plac' i], input[name*='plac' i], "
+            "input[placeholder*='plac' i], input[type='text']"
+        )
+        await campo.first.wait_for(state="visible", timeout=TIMEOUT)
+        await campo.first.fill(placa.upper().strip())
+
+        # Botón consultar
+        btn = page.locator(
+            "button:has-text('Consultar'), button:has-text('Buscar'), "
+            "input[type='submit'], button[type='submit']"
+        )
+        await btn.first.click()
+        await asyncio.sleep(3)
+
+        # Esperar resultado
+        await page.wait_for_selector(
+            "table, .resultado, #resultado, .grid, .panel-body",
+            timeout=TIMEOUT
+        )
+
+        datos = {}
+
+        # Extraer de tabla
+        filas = await page.locator("table tr").all()
+        for fila in filas:
+            celdas = await fila.locator("td, th").all()
+            textos = [await c.inner_text() for c in celdas]
+            textos = [t.strip() for t in textos if t.strip()]
+            if len(textos) >= 2:
+                datos[textos[0].rstrip(":")] = " ".join(textos[1:])
+
+        # Buscar campos específicos por label
+        if not datos:
+            for label_text in ["Estado", "Inicio", "Fin", "Resultado", "Vigencia"]:
+                try:
+                    el = page.locator(f"label:has-text('{label_text}'), td:has-text('{label_text}')")
+                    if await el.count() > 0:
+                        parent = el.first.locator("..").locator("td, span, input").last
+                        valor = await parent.inner_text()
+                        datos[label_text] = valor.strip()
+                except Exception:
+                    continue
+
+        # Determinar estado de ITV
+        estado = datos.get("Estado", datos.get("Resultado", "")).lower()
+        if "aprobado" in estado or "vigente" in estado or "favorable" in estado:
+            resultado.marcar_ok(datos)
+        elif "desaprobado" in estado or "vencido" in estado or "rechazado" in estado:
+            resultado.marcar_advertencia(
+                datos,
+                "⚠️ La Inspección Técnica Vehicular está VENCIDA o DESAPROBADA."
+            )
+        elif datos:
+            resultado.marcar_ok(datos)
+        else:
+            resultado.marcar_sin_datos(
+                "No se encontró registro de Inspección Técnica para esta placa."
+            )
+
+    except PWTimeout:
+        resultado.marcar_error("Tiempo de espera agotado al consultar MTC.")
+    except Exception as exc:
+        resultado.marcar_error(f"Error inesperado: {exc}")
+
+    return resultado
+
+"""
+papeleta_base.py — Función genérica para consulta de papeletas municipales.
+
+La mayoría de municipalidades tienen el mismo patrón:
+  1. Ir a la URL
+  2. Ingresar la placa
+  3. Hacer click en Buscar
+  4. Extraer resultados o confirmar "sin papeletas"
+
+Para casos especiales (login, selector de tipo, campos adicionales),
+cada scraper específico extiende este comportamiento.
+"""
+import asyncio
+from playwright.async_api import Page, TimeoutError as PWTimeout
+from config import TIMEOUT
+from scrapers.base import ResultadoConsulta
+
+
+PALABRAS_SIN_DEUDA = [
+    "no registra", "sin multas", "sin papeletas", "no tiene",
+    "no se encontraron", "no hay", "no presenta", "0 resultado",
+    "sin infracciones", "no existe", "not found", "sin deuda",
+]
+
+PALABRAS_CON_DEUDA = [
+    "monto", "deuda", "infracción", "multa", "papeleta",
+    "pendiente", "s/.", "sol", "fecha de infracción",
+]
+
+
+async def consultar_papeleta(
+    page: Page,
+    url: str,
+    ciudad: str,
+    placa: str,
+    *,
+    selector_placa: str = None,
+    selector_buscar: str = None,
+    selector_tipo: str = None,
+    valor_tipo: str = "Placa",
+    campos_extra: dict = None,
+    espera_extra: float = 2.0,
+    selector_resultado: str = None,
+) -> ResultadoConsulta:
+    """
+    Consulta genérica de papeletas por placa.
+
+    Args:
+        page             : Página Playwright.
+        url              : URL del portal municipal.
+        ciudad           : Nombre de la ciudad (para el reporte).
+        placa            : Placa del vehículo.
+        selector_placa   : CSS selector del campo placa (usa heurísticas si None).
+        selector_buscar  : CSS selector del botón buscar (usa heurísticas si None).
+        selector_tipo    : CSS selector del select de tipo de búsqueda (opcional).
+        valor_tipo       : Valor a seleccionar en el select tipo (ej: "Placa").
+        campos_extra     : Dict {selector: valor} para campos adicionales.
+        espera_extra     : Segundos extra de espera después del click.
+        selector_resultado: CSS selector donde aparece el resultado.
+    """
+    resultado = ResultadoConsulta(
+        fuente=f"Papeletas — {ciudad}",
+        url=url
+    )
+
+    # Selectores heurísticos por defecto
+    sel_placa = selector_placa or (
+        "input[id*='plac' i], input[name*='plac' i], "
+        "input[placeholder*='plac' i], input[id*='nro_plac' i], "
+        "input[type='text']"
+    )
+    sel_buscar = selector_buscar or (
+        "button:has-text('Buscar'), button:has-text('Consultar'), "
+        "input[type='submit'], button[type='submit'], "
+        "a:has-text('Buscar'), button:has-text('Ver')"
+    )
+    sel_resultado = selector_resultado or (
+        "table, .resultado, #resultado, .alert, .mensaje, "
+        ".infracciones, .papeleta, p, div.content"
+    )
+
+    try:
+        await page.goto(url, timeout=TIMEOUT, wait_until="domcontentloaded")
+        await asyncio.sleep(2)
+
+        # Seleccionar tipo si aplica
+        if selector_tipo:
+            sel = page.locator(selector_tipo)
+            if await sel.count() > 0:
+                try:
+                    await sel.first.select_option(label=valor_tipo)
+                except Exception:
+                    try:
+                        await sel.first.select_option(value=valor_tipo.lower())
+                    except Exception:
+                        pass
+                await asyncio.sleep(0.5)
+
+        # Campos extra (DNI, correo, etc.)
+        if campos_extra:
+            for sel_extra, val_extra in campos_extra.items():
+                campo = page.locator(sel_extra)
+                if await campo.count() > 0:
+                    await campo.first.fill(str(val_extra))
+                    await asyncio.sleep(0.3)
+
+        # Ingresar placa
+        campo = page.locator(sel_placa)
+        await campo.first.wait_for(state="visible", timeout=TIMEOUT)
+        await campo.first.fill(placa.upper().strip())
+
+        # Buscar
+        btn = page.locator(sel_buscar)
+        await btn.first.click()
+        await asyncio.sleep(espera_extra + 1)
+
+        # Esperar resultado
+        try:
+            await page.wait_for_selector(sel_resultado, timeout=TIMEOUT)
+        except PWTimeout:
+            pass  # Continuar e intentar extraer de todos modos
+
+        # Leer texto completo de la página
+        texto = (await page.locator("body").inner_text()).lower()
+
+        # Determinar si hay deuda
+        sin_deuda = any(p in texto for p in PALABRAS_SIN_DEUDA)
+        con_deuda = any(p in texto for p in PALABRAS_CON_DEUDA)
+
+        if sin_deuda and not con_deuda:
+            resultado.marcar_ok({
+                "Ciudad": ciudad,
+                "Estado": "Sin papeletas / deudas",
+                "Resumen": "✅ No registra papeletas en esta jurisdicción."
+            })
+            return resultado
+
+        # Intentar extraer tabla de papeletas
+        papeletas = []
+        filas = await page.locator("table tbody tr").all()
+        headers = []
+        ths = await page.locator("table thead th, table tr:first-child th").all()
+        for th in ths:
+            h = (await th.inner_text()).strip()
+            if h:
+                headers.append(h)
+
+        for fila in filas:
+            celdas = await fila.locator("td").all()
+            valores = [(await c.inner_text()).strip() for c in celdas]
+            valores = [v for v in valores if v]
+            if valores:
+                if headers and len(headers) == len(valores):
+                    papeletas.append(dict(zip(headers, valores)))
+                else:
+                    papeletas.append({"detalle": " | ".join(valores)})
+
+        if papeletas:
+            resultado.marcar_advertencia(
+                {"Ciudad": ciudad, "papeletas": papeletas, "total": len(papeletas)},
+                f"⚠️ Se encontraron {len(papeletas)} papeleta(s) en {ciudad}."
+            )
+        elif con_deuda:
+            # Hay indicios de deuda pero no tabla estructurada
+            lineas_deuda = [
+                l.strip() for l in (await page.locator("body").inner_text()).split("\n")
+                if any(p in l.lower() for p in PALABRAS_CON_DEUDA) and l.strip()
+            ]
+            resultado.marcar_advertencia(
+                {"Ciudad": ciudad, "detalle": " | ".join(lineas_deuda[:5])},
+                f"⚠️ Se detectó posible deuda en {ciudad}. Verifica manualmente."
+            )
+        else:
+            resultado.marcar_sin_datos(
+                f"No se pudo determinar el estado de papeletas en {ciudad}. "
+                f"Verifica el portal directamente: {url}"
+            )
+
+    except PWTimeout:
+        resultado.marcar_error(f"Tiempo de espera agotado al consultar {ciudad}.")
+    except Exception as exc:
+        resultado.marcar_error(f"Error consultando {ciudad}: {exc}")
+
+    return resultado
+
+"""
+piura.py — Papeletas Municipalidad de Piura.
+URL: http://www.munipiura.gob.pe/consulta-de-multas-de-transito#buscar-por-placa
+"""
+from playwright.async_api import Page
+from config import URLS
+from scrapers.papeleta_base import consultar_papeleta
+
+async def consultar(page: Page, placa: str):
+    return await consultar_papeleta(
+        page=page, url=URLS["piura"], ciudad="Piura", placa=placa,
+        selector_buscar="button:has-text('Buscar'), input[type='submit'], button[type='submit']",
+        espera_extra=2.0,
+    )
+
+"""
+sbs_accidentes.py — Consulta de accidentes cubiertos por SOAT en SBS.
+URL: https://servicios.sbs.gob.pe/reportesoat/ReporteCentralRiesgo
+
+Extrae: Número de accidentes registrados por pólizas SOAT en los últimos 5 años.
+"""
+import asyncio
+from playwright.async_api import Page, TimeoutError as PWTimeout
+from config import URLS, TIMEOUT
+from scrapers.base import ResultadoConsulta
+
+
+async def consultar(page: Page, placa: str) -> ResultadoConsulta:
+    resultado = ResultadoConsulta(
+        fuente="SBS — Accidentes Coberturados por SOAT",
+        url=URLS["sbs_accidentes"]
+    )
+
+    try:
+        await page.goto(URLS["sbs_accidentes"], timeout=TIMEOUT, wait_until="domcontentloaded")
+        await asyncio.sleep(2)
+
+        # Campo placa
+        campo = page.locator(
+            "input[id*='plac' i], input[name*='plac' i], "
+            "input[placeholder*='plac' i], input[type='text']"
+        )
+        await campo.first.wait_for(state="visible", timeout=TIMEOUT)
+        await campo.first.fill(placa.upper().strip())
+
+        # Botón consultar
+        btn = page.locator(
+            "button:has-text('Consultar'), button:has-text('Buscar'), "
+            "input[type='submit'], button[type='submit']"
+        )
+        await btn.first.click()
+        await asyncio.sleep(3)
+
+        # Esperar resultado
+        await page.wait_for_selector(
+            "table, .resultado, #resultado, p, .alert",
+            timeout=TIMEOUT
+        )
+
+        # Extraer el texto completo del resultado
+        contenido = await page.locator("main, #content, .container, body").first.inner_text()
+
+        # Buscar el número de accidentes en el texto
+        import re
+        datos = {}
+
+        # Patrón: "cuenta con X accidente(s)" o similar
+        patron_accidentes = re.search(
+            r'(\d+)\s*accidente[s]?\s*coberturado[s]?',
+            contenido, re.IGNORECASE
+        )
+        if patron_accidentes:
+            num = int(patron_accidentes.group(1))
+            datos["Accidentes en últimos 5 años"] = str(num)
+            datos["Fuente"] = "Pólizas SOAT"
+            if num == 0:
+                resultado.marcar_ok({**datos, "resumen": "✅ Sin accidentes registrados"})
+            elif num <= 2:
+                resultado.marcar_advertencia(
+                    datos,
+                    f"⚠️ El vehículo tiene {num} accidente(s) registrado(s) en los últimos 5 años."
+                )
+            else:
+                resultado.marcar_advertencia(
+                    datos,
+                    f"🚨 El vehículo tiene {num} accidente(s) — historial alto de siniestros."
+                )
+        else:
+            # Sin patrón numérico: extraer el párrafo relevante
+            lineas_relevantes = [
+                l.strip() for l in contenido.split("\n")
+                if any(k in l.lower() for k in ["accidente", "cobertura", "soat", "siniestro", "placa"])
+            ]
+            if lineas_relevantes:
+                datos["Resultado"] = " | ".join(lineas_relevantes[:3])
+                resultado.marcar_ok(datos)
+            else:
+                resultado.marcar_sin_datos(
+                    "No se encontró información de accidentes para esta placa."
+                )
+
+    except PWTimeout:
+        resultado.marcar_error("Tiempo de espera agotado al consultar SBS.")
+    except Exception as exc:
+        resultado.marcar_error(f"Error inesperado: {exc}")
+
+    return resultado
+
+"""
+soat_apeseg.py — Consulta de vigencia del SOAT en APESEG.
+URL: https://www.apeseg.org.pe/consultas-soat/
+
+Extrae: Estado, Vigente desde, Vigente hasta.
+"""
+import asyncio
+from playwright.async_api import Page, TimeoutError as PWTimeout
+from config import URLS, TIMEOUT
+from scrapers.base import ResultadoConsulta
+
+
+async def consultar(page: Page, placa: str) -> ResultadoConsulta:
+    resultado = ResultadoConsulta(
+        fuente="APESEG — Consulta SOAT",
+        url=URLS["soat_apeseg"]
+    )
+
+    try:
+        await page.goto(URLS["soat_apeseg"], timeout=TIMEOUT, wait_until="domcontentloaded")
+        await asyncio.sleep(2)  # JS inicial
+
+        # Campo placa — APESEG usa un input visible en el formulario de consulta
+        campo = page.locator(
+            "input[placeholder*='placa' i], input[name*='placa' i], "
+            "input[id*='placa' i], input[type='text']"
+        )
+        await campo.first.wait_for(state="visible", timeout=TIMEOUT)
+        await campo.first.fill(placa.upper().strip())
+
+        # Botón consultar
+        btn = page.locator(
+            "button:has-text('Consultar'), button:has-text('Buscar'), "
+            "button[type='submit'], input[type='submit']"
+        )
+        await btn.first.click()
+        await asyncio.sleep(2)
+
+        # Esperar resultado
+        await page.wait_for_selector(
+            ".resultado, table, .soat-info, #resultado, .card-body",
+            timeout=TIMEOUT
+        )
+
+        # Extraer datos
+        datos = {}
+        campos_mapa = {
+            "Estado"        : ["estado", "vigente", "situacion"],
+            "Vigente desde" : ["vigente desde", "inicio", "fecha inicio", "desde"],
+            "Vigente hasta" : ["vigente hasta", "fin", "fecha fin", "hasta", "vencimiento"],
+            "Compañía"      : ["compañia", "empresa", "aseguradora"],
+        }
+
+        # Buscar en tabla
+        filas = await page.locator("table tr").all()
+        for fila in filas:
+            texto = await fila.inner_text()
+            partes = [p.strip() for p in texto.split("\t") if p.strip()]
+            if len(partes) < 2:
+                partes = [p.strip() for p in texto.split("\n") if p.strip()]
+            if len(partes) >= 2:
+                clave = partes[0].rstrip(":").strip()
+                valor = " ".join(partes[1:]).strip()
+                datos[clave] = valor
+
+        # Buscar por texto si la tabla no dio resultados
+        if not datos:
+            for nombre, variantes in campos_mapa.items():
+                for variante in variantes:
+                    try:
+                        el = page.locator(f"*:has-text('{variante}')").last
+                        if await el.count() > 0:
+                            texto = await el.inner_text()
+                            lineas = [l.strip() for l in texto.split("\n") if l.strip()]
+                            if len(lineas) >= 2:
+                                datos[nombre] = lineas[-1]
+                                break
+                    except Exception:
+                        continue
+
+        # Determinar estado del SOAT
+        estado_soat = datos.get("Estado", datos.get("estado", "")).lower()
+        if "vigente" in estado_soat or "activo" in estado_soat:
+            resultado.marcar_ok(datos)
+        elif "vencido" in estado_soat or "expirado" in estado_soat:
+            resultado.marcar_advertencia(datos, "⚠️ El SOAT está VENCIDO. El vehículo no puede circular legalmente.")
+        elif datos:
+            resultado.marcar_ok(datos)
+        else:
+            resultado.marcar_sin_datos("No se encontró información del SOAT para esta placa.")
+
+    except PWTimeout:
+        resultado.marcar_error("Tiempo de espera agotado al consultar APESEG.")
+    except Exception as exc:
+        resultado.marcar_error(f"Error inesperado: {exc}")
+
+    return resultado
+
+"""
+sunarp_siguelo.py — Consulta de monto pagado por el vehículo en SUNARP SigueloPlus.
+URL: https://sigueloplus.sunarp.gob.pe/siguelo/
+
+Proceso:
+  1. Navegar al portal SigueloPlus
+  2. Ingresar Oficina Registral, Año del título y Número del título
+     (estos datos provienen del resultado de sunarp_sprl.py)
+  3. Click en "Acceder al asiento de inscripción y TIVE"
+  4. Click en el ícono verde
+  5. Extraer: Acto, Precio, Monto pagado, Fecha, Fecha de asiento
+
+NOTA: Este scraper necesita el número de título obtenido de SUNARP SPRL.
+Si no se dispone del título, se marca como sin_datos.
+"""
+import asyncio
+import re
+from playwright.async_api import Page, TimeoutError as PWTimeout
+from config import URLS, TIMEOUT
+from scrapers.base import ResultadoConsulta
+
+
+async def consultar(
+    page: Page,
+    titulo_numero: str = "",
+    titulo_anio: str = "",
+    oficina_registral: str = "LIMA"
+) -> ResultadoConsulta:
+    """
+    Args:
+        page              : Página de Playwright.
+        titulo_numero     : Número de título obtenido de SUNARP SPRL (ej: "00735749").
+        titulo_anio       : Año del título (ej: "2024").
+        oficina_registral : Oficina registral (ej: "LIMA").
+    """
+    resultado = ResultadoConsulta(
+        fuente="SUNARP SigueloPlus — Monto Pagado por el Vehículo",
+        url=URLS["sunarp_siguelo"]
+    )
+
+    # Validar que tenemos el número de título
+    if not titulo_numero or not titulo_anio:
+        resultado.marcar_sin_datos(
+            "No se dispone del número de título registral. "
+            "Este dato es obtenido automáticamente de la consulta SUNARP SPRL (paso 4). "
+            "Si el SPRL falló, esta consulta no puede ejecutarse."
+        )
+        return resultado
+
+    try:
+        await page.goto(URLS["sunarp_siguelo"], timeout=TIMEOUT, wait_until="domcontentloaded")
+        await asyncio.sleep(2)
+
+        # ── PASO 1: Seleccionar Oficina Registral ────────────────────────────
+        selector_oficina = page.locator(
+            "select[id*='oficina' i], select[name*='oficina' i], "
+            "select[id*='sede' i], select:first-of-type"
+        )
+        if await selector_oficina.count() > 0:
+            try:
+                await selector_oficina.first.select_option(label=oficina_registral)
+            except Exception:
+                opciones = await selector_oficina.first.locator("option").all()
+                for op in opciones:
+                    if oficina_registral.upper() in (await op.inner_text()).upper():
+                        await selector_oficina.first.select_option(
+                            value=await op.get_attribute("value")
+                        )
+                        break
+            await asyncio.sleep(0.5)
+
+        # ── PASO 2: Año del título ────────────────────────────────────────────
+        campo_anio = page.locator(
+            "input[id*='anio' i], input[name*='anio' i], input[id*='año' i], "
+            "input[placeholder*='año' i], input[placeholder*='anio' i]"
+        )
+        if await campo_anio.count() > 0:
+            await campo_anio.first.fill(titulo_anio.strip())
+        await asyncio.sleep(0.3)
+
+        # ── PASO 3: Número del título ─────────────────────────────────────────
+        campo_numero = page.locator(
+            "input[id*='numero' i], input[name*='numero' i], "
+            "input[placeholder*='número' i], input[placeholder*='titulo' i], "
+            "input[type='text']:last-of-type"
+        )
+        await campo_numero.first.fill(titulo_numero.strip())
+
+        # ── PASO 4: Botón Buscar ──────────────────────────────────────────────
+        btn_buscar = page.locator(
+            "button:has-text('Buscar'), input[type='submit'], "
+            "button[type='submit'], button:has-text('Consultar')"
+        )
+        await btn_buscar.first.click()
+        await asyncio.sleep(3)
+
+        # ── PASO 5: Click en "Acceder al asiento de inscripción y TIVE" ──────
+        btn_acceder = page.locator(
+            "a:has-text('Acceder'), button:has-text('Acceder'), "
+            "a:has-text('asiento'), a:has-text('TIVE'), "
+            ".btn-acceder, [title*='asiento' i]"
+        )
+        await btn_acceder.first.wait_for(state="visible", timeout=TIMEOUT)
+        await btn_acceder.first.click()
+        await asyncio.sleep(2)
+
+        # ── PASO 6: Click en ícono verde ─────────────────────────────────────
+        icono_verde = page.locator(
+            ".btn-success, .btn-green, button.green, a.green, "
+            "img[src*='green'], .icon-green, td.green a, "
+            "button:has-text('Ver'), a[title*='ver' i]"
+        )
+        if await icono_verde.count() > 0:
+            # Manejar posible nueva ventana/popup
+            try:
+                async with page.context.expect_page(timeout=5_000) as nueva_p_info:
+                    await icono_verde.first.click()
+                nueva_pagina = await nueva_p_info.value
+                await nueva_pagina.wait_for_load_state("domcontentloaded")
+                await asyncio.sleep(2)
+                texto_resultado = await nueva_pagina.locator("body").inner_text()
+                await nueva_pagina.close()
+            except Exception:
+                await icono_verde.first.click()
+                await asyncio.sleep(2)
+                texto_resultado = await page.locator("body").inner_text()
+        else:
+            texto_resultado = await page.locator("body").inner_text()
+
+        # ── PASO 7: Extraer datos ─────────────────────────────────────────────
+        datos = {
+            "Año / Título": f"{titulo_anio} — {titulo_numero}",
+            "Oficina Registral": oficina_registral,
+        }
+
+        campos_a_extraer = ["Acto", "Precio", "Monto pagado", "Fecha", "Fecha de asiento"]
+        for campo in campos_a_extraer:
+            patron = rf"{campo}\s*[:\-]?\s*(.+?)(?=\n|$)"
+            m = re.search(patron, texto_resultado, re.IGNORECASE)
+            if m:
+                datos[campo] = m.group(1).strip()
+
+        # Extraer también de tabla si existe
+        filas = await page.locator("table tr").all()
+        for fila in filas:
+            texto = await fila.inner_text()
+            partes = [p.strip() for p in texto.split("\n") if p.strip()]
+            if len(partes) >= 2:
+                datos[partes[0].rstrip(":")] = " ".join(partes[1:])
+
+        if len(datos) > 2:  # Más que solo los campos base
+            resultado.marcar_ok(datos)
+        else:
+            resultado.marcar_sin_datos(
+                "Se ejecutó la consulta pero no se pudo extraer el monto. "
+                "Es posible que el portal haya cambiado su estructura."
+            )
+
+    except PWTimeout:
+        resultado.marcar_error("Tiempo de espera agotado en SUNARP SigueloPlus.")
+    except Exception as exc:
+        resultado.marcar_error(f"Error en SigueloPlus: {exc}")
+
+    return resultado
+
+"""
+sunarp_sprl.py — Historial de propietarios en SUNARP SPRL.
+URL: https://sprl.sunarp.gob.pe/sprl/main/partidas-base-grafica-registral
+
+Proceso multi-paso:
+  1. Login con usuario y contraseña
+  2. Seleccionar Oficina Registral (obtenida de la consulta SUNARP vehicular)
+  3. Área registral: Propiedad Vehicular
+  4. Buscar por Placa
+  5. Ver asientos → click en el último título (cuadro verde)
+  6. Extraer: Título, Inscripción, Presentación, Rubro, Acto, Participantes
+  7. Detectar alertas: "Embargo", "Prescripción de dominio"
+
+Retorna también el número de título para uso en sunarp_siguelo.py.
+"""
+import asyncio
+from playwright.async_api import Page, TimeoutError as PWTimeout
+from config import URLS, TIMEOUT, SUNARP_SPRL_USUARIO, SUNARP_SPRL_CLAVE
+from scrapers.base import ResultadoConsulta
+
+
+# Palabras clave que generan alerta legal
+ALERTAS_LEGALES = [
+    "prescripción de dominio", "embargo", "medida cautelar",
+    "anotación de demanda", "hipoteca", "gravamen", "prohibición",
+    "inmovilización", "bloqueo registral",
+]
+
+
+async def consultar(page: Page, placa: str, sede: str = "") -> ResultadoConsulta:
+    """
+    Args:
+        page  : Página de Playwright (contexto compartido).
+        placa : Placa del vehículo.
+        sede  : Sede/Oficina registral (ej: "LIMA", obtenida de SUNARP vehicular).
+                Si está vacía, se intenta con "LIMA" por defecto.
+    """
+    resultado = ResultadoConsulta(
+        fuente="SUNARP SPRL — Historial de Propietarios",
+        url=URLS["sunarp_sprl"]
+    )
+
+    if not SUNARP_SPRL_USUARIO or not SUNARP_SPRL_CLAVE:
+        resultado.marcar_error(
+            "Credenciales SUNARP SPRL no configuradas. "
+            "Completa SUNARP_SPRL_USUARIO y SUNARP_SPRL_CLAVE en el archivo .env"
+        )
+        return resultado
+
+    oficina = sede.strip().upper() if sede else "LIMA"
+
+    try:
+        # ── PASO 1: Navegar al portal SPRL ──────────────────────────────────
+        await page.goto(URLS["sunarp_sprl"], timeout=TIMEOUT, wait_until="domcontentloaded")
+        await asyncio.sleep(2)
+
+        # ── PASO 2: Login ────────────────────────────────────────────────────
+        # Campo usuario
+        campo_usuario = page.locator(
+            "input[name*='user' i], input[id*='user' i], "
+            "input[placeholder*='usuario' i], input[type='text']:first-of-type"
+        )
+        await campo_usuario.first.wait_for(state="visible", timeout=TIMEOUT)
+        await campo_usuario.first.fill(SUNARP_SPRL_USUARIO)
+
+        # Campo contraseña
+        campo_clave = page.locator("input[type='password']")
+        await campo_clave.first.fill(SUNARP_SPRL_CLAVE)
+
+        # Botón ingresar
+        btn_login = page.locator(
+            "button:has-text('Ingresar'), button:has-text('Iniciar'), "
+            "input[type='submit'], button[type='submit']"
+        )
+        await btn_login.first.click()
+        await asyncio.sleep(3)
+
+        # Verificar login exitoso (esperar que desaparezca el formulario de login)
+        try:
+            await page.wait_for_selector(
+                "input[type='password']",
+                state="hidden",
+                timeout=10_000
+            )
+        except PWTimeout:
+            # Verificar si hay mensaje de error de login
+            error_texto = await page.locator(".error, .alert-danger, .msg-error").first.inner_text() if await page.locator(".error, .alert-danger").count() > 0 else ""
+            resultado.marcar_error(
+                f"Login fallido en SUNARP SPRL. "
+                f"Verifica usuario/contraseña en .env. {error_texto}".strip()
+            )
+            return resultado
+
+        # ── PASO 3: Seleccionar Oficina Registral ────────────────────────────
+        await asyncio.sleep(2)
+        selector_oficina = page.locator(
+            "select[id*='oficina' i], select[name*='oficina' i], "
+            "select[id*='sede' i], select[name*='sede' i]"
+        )
+        if await selector_oficina.count() > 0:
+            # Intentar seleccionar por texto de la sede
+            try:
+                await selector_oficina.first.select_option(label=oficina)
+            except Exception:
+                # Si no encuentra exacto, seleccionar la opción que contenga el texto
+                opciones = await selector_oficina.first.locator("option").all()
+                for op in opciones:
+                    texto_op = (await op.inner_text()).upper()
+                    if oficina in texto_op or "LIMA" in texto_op:
+                        valor = await op.get_attribute("value")
+                        await selector_oficina.first.select_option(value=valor)
+                        break
+            await asyncio.sleep(1)
+
+        # ── PASO 4: Seleccionar Área Registral → Propiedad Vehicular ─────────
+        selector_area = page.locator(
+            "select[id*='area' i], select[name*='area' i], "
+            "select[id*='registro' i]"
+        )
+        if await selector_area.count() > 0:
+            try:
+                await selector_area.first.select_option(label="Propiedad Vehicular")
+            except Exception:
+                try:
+                    await selector_area.first.select_option(label="PROPIEDAD VEHICULAR")
+                except Exception:
+                    pass
+            await asyncio.sleep(1)
+
+        # ── PASO 5: Buscar por Placa ─────────────────────────────────────────
+        # Seleccionar criterio "Placa"
+        selector_criterio = page.locator(
+            "select[id*='criterio' i], select[name*='criterio' i], "
+            "select[id*='tipo' i], select[id*='buscar' i]"
+        )
+        if await selector_criterio.count() > 0:
+            try:
+                await selector_criterio.first.select_option(label="Placa")
+            except Exception:
+                try:
+                    await selector_criterio.first.select_option(label="PLACA")
+                except Exception:
+                    pass
+            await asyncio.sleep(0.5)
+
+        # Ingresar placa
+        campo_placa = page.locator(
+            "input[id*='plac' i], input[name*='plac' i], "
+            "input[placeholder*='plac' i], input[type='text']:last-of-type"
+        )
+        await campo_placa.first.wait_for(state="visible", timeout=TIMEOUT)
+        await campo_placa.first.fill(placa.upper().strip())
+
+        # Botón buscar
+        btn_buscar = page.locator(
+            "button:has-text('Buscar'), button:has-text('Consultar'), "
+            "button[type='submit'], input[value*='Buscar' i]"
+        )
+        await btn_buscar.first.click()
+        await asyncio.sleep(3)
+
+        # ── PASO 6: Ver Asientos ─────────────────────────────────────────────
+        btn_asientos = page.locator(
+            "button:has-text('Ver asientos'), a:has-text('Ver asientos'), "
+            "button:has-text('Asientos'), a:has-text('Asientos'), "
+            ".btn-asientos, [title*='asiento' i]"
+        )
+        await btn_asientos.first.wait_for(state="visible", timeout=TIMEOUT)
+        await btn_asientos.first.click()
+        await asyncio.sleep(3)
+
+        # ── PASO 7: Click en el último título (cuadro verde) ─────────────────
+        # Los títulos aparecen como filas — tomar el último
+        titulos = page.locator(
+            "table tr.green, table tr.titulo, .titulo-item, "
+            ".cuadro-verde, tr[class*='green'], tr[class*='titulo']"
+        )
+        count = await titulos.count()
+
+        if count == 0:
+            # Intentar con cualquier fila de tabla y tomar la última
+            titulos = page.locator("table tbody tr")
+            count = await titulos.count()
+
+        if count == 0:
+            resultado.marcar_sin_datos(
+                "No se encontraron títulos registrales para esta placa en SUNARP SPRL."
+            )
+            return resultado
+
+        # Guardar cantidad de títulos
+        total_titulos = count
+
+        # Click en el último título — abre popup o nueva ventana
+        ultimo_titulo = titulos.nth(count - 1)
+
+        # Manejar nueva ventana/popup
+        async with page.context.expect_page() as nueva_pagina_info:
+            await ultimo_titulo.click()
+            await asyncio.sleep(1)
+
+        nueva_pagina = await nueva_pagina_info.value
+        await nueva_pagina.wait_for_load_state("domcontentloaded")
+        await asyncio.sleep(2)
+
+        # ── PASO 8: Extraer datos del asiento ────────────────────────────────
+        contenido_total = await nueva_pagina.content()
+        texto_total = await nueva_pagina.locator("body").inner_text()
+
+        datos = {
+            "Total de títulos registrados": str(total_titulos),
+        }
+
+        # Extraer campos específicos por su label
+        campos_objetivo = [
+            "Título", "Inscripción", "Presentación", "Rubro",
+            "Acto", "Participantes Naturales", "Participantes Jurídicos",
+        ]
+
+        filas = await nueva_pagina.locator("table tr, .field-row, dl dt").all()
+        for fila in filas:
+            texto = await fila.inner_text()
+            partes = [p.strip() for p in texto.split("\n") if p.strip()]
+            if len(partes) >= 2:
+                clave = partes[0].rstrip(":")
+                valor = " ".join(partes[1:]).strip()
+                datos[clave] = valor
+
+        # Si no se obtuvo nada de las filas, parsear el texto plano
+        if len(datos) <= 1:
+            import re
+            for campo in campos_objetivo:
+                patron = rf"{campo}\s*[:\-]?\s*(.+?)(?=\n|$)"
+                m = re.search(patron, texto_total, re.IGNORECASE)
+                if m:
+                    datos[campo] = m.group(1).strip()
+
+        # ── PASO 9: Detectar alertas legales ─────────────────────────────────
+        alertas_encontradas = [
+            alerta.title() for alerta in ALERTAS_LEGALES
+            if alerta in texto_total.lower()
+        ]
+
+        await nueva_pagina.close()
+
+        if alertas_encontradas:
+            resultado.marcar_advertencia(
+                datos,
+                f"🚨 ALERTA LEGAL detectada en el registro: "
+                f"{', '.join(alertas_encontradas)}. "
+                f"Consulta a un abogado antes de proceder con la compra."
+            )
+        else:
+            resultado.marcar_ok(datos)
+
+    except PWTimeout:
+        resultado.marcar_error(
+            "Tiempo de espera agotado en SUNARP SPRL. "
+            "El portal puede estar lento o requiere resolver un CAPTCHA."
+        )
+    except Exception as exc:
+        resultado.marcar_error(f"Error en SUNARP SPRL: {exc}")
+
+    return resultado
+
+"""
+sunarp_vehicular.py — Consulta de propiedad del vehículo en SUNARP.
+URL: https://consultavehicular.sunarp.gob.pe/consulta-vehicular/inicio
+
+Extrae: N° de placa, Marca, Modelo, Sede, Año modelo, Propietario(s).
+"""
+import asyncio
+from playwright.async_api import Page, TimeoutError as PWTimeout
+from config import URLS, TIMEOUT
+from scrapers.base import ResultadoConsulta
+
+
+async def consultar(page: Page, placa: str) -> ResultadoConsulta:
+    resultado = ResultadoConsulta(
+        fuente="SUNARP — Consulta Vehicular",
+        url=URLS["sunarp_vehicular"]
+    )
+
+    try:
+        await page.goto(URLS["sunarp_vehicular"], timeout=TIMEOUT, wait_until="domcontentloaded")
+
+        # Esperar campo de placa
+        campo_placa = page.locator("input[placeholder*='placa' i], input[name*='placa' i], input#placa, input[id*='placa' i]")
+        await campo_placa.first.wait_for(state="visible", timeout=TIMEOUT)
+        await campo_placa.first.fill(placa.upper().strip())
+
+        # Botón de búsqueda
+        btn = page.locator("button[type='submit'], button:has-text('Consultar'), button:has-text('Buscar'), input[type='submit']")
+        await btn.first.click()
+
+        # --- Manejo de CAPTCHA ---
+        # Si la página tiene CAPTCHA, esperamos hasta 60 segundos para resolución manual
+        try:
+            # Intentar detectar CAPTCHA visible
+            captcha = page.locator("iframe[src*='recaptcha'], .g-recaptcha, #captcha")
+            if await captcha.count() > 0:
+                print("\n  ⚠️  CAPTCHA detectado en SUNARP. Por favor, resuélvelo en el navegador.")
+                print("      El sistema esperará hasta 60 segundos...")
+                # Esperar a que desaparezca el CAPTCHA o aparezcan resultados
+                await page.wait_for_selector(
+                    ".resultado, table, .datos-vehiculo, #resultado",
+                    timeout=60_000
+                )
+        except PWTimeout:
+            pass
+
+        # Esperar resultados
+        await page.wait_for_selector(
+            "table, .resultado, .card, .datos-vehiculo, #datos",
+            timeout=TIMEOUT
+        )
+        await asyncio.sleep(1)
+
+        # Extraer datos — los campos pueden variar según la versión del portal
+        datos = {}
+
+        # Estrategia 1: tabla con pares clave-valor
+        filas = await page.locator("table tr, .field-row, .dato-item").all()
+        for fila in filas:
+            texto = await fila.inner_text()
+            partes = [p.strip() for p in texto.split("\n") if p.strip()]
+            if len(partes) >= 2:
+                clave = partes[0].rstrip(":").strip()
+                valor = partes[1].strip()
+                datos[clave] = valor
+
+        # Estrategia 2: buscar campos específicos por texto
+        campos_objetivo = {
+            "Placa"        : ["placa", "n° de placa", "numero de placa"],
+            "Marca"        : ["marca"],
+            "Modelo"       : ["modelo"],
+            "Sede"         : ["sede", "oficina registral"],
+            "Año modelo"   : ["año", "año modelo", "año fabricacion"],
+            "Propietario"  : ["propietario", "titular", "nombre"],
+        }
+
+        for nombre, variantes in campos_objetivo.items():
+            if nombre not in datos:
+                for variante in variantes:
+                    locator = page.locator(f"*:has-text('{variante.capitalize()}')")
+                    try:
+                        count = await locator.count()
+                        if count > 0:
+                            parent = locator.first
+                            texto = await parent.inner_text()
+                            # Tomar el texto que viene después del label
+                            lineas = [l.strip() for l in texto.split("\n") if l.strip()]
+                            if len(lineas) >= 2:
+                                datos[nombre] = lineas[1]
+                                break
+                    except Exception:
+                        continue
+
+        if datos:
+            resultado.marcar_ok(datos)
+        else:
+            # Último recurso: capturar todo el texto visible de la sección de resultado
+            contenido = await page.locator("main, #content, .container").first.inner_text()
+            resultado.marcar_sin_datos(
+                f"Se cargó la página pero no se pudieron extraer campos estructurados. "
+                f"Contenido obtenido:\n{contenido[:500]}"
+            )
+
+    except PWTimeout:
+        resultado.marcar_error(
+            "Tiempo de espera agotado. El sitio SUNARP puede estar lento o requiere CAPTCHA manual."
+        )
+    except Exception as exc:
+        resultado.marcar_error(f"Error inesperado: {exc}")
+
+    return resultado
+
+"""
+sutran.py — Consulta de récord de infracciones en SUTRAN.
+URL: https://www.sutran.gob.pe/consultas/record-de-infracciones/record-de-infracciones/
+
+Extrae: Listado de infracciones (código, descripción, fecha, monto, estado).
+"""
+import asyncio
+from playwright.async_api import Page, TimeoutError as PWTimeout
+from config import URLS, TIMEOUT
+from scrapers.base import ResultadoConsulta
+
+
+async def consultar(page: Page, placa: str) -> ResultadoConsulta:
+    resultado = ResultadoConsulta(
+        fuente="SUTRAN — Récord de Infracciones",
+        url=URLS["sutran"]
+    )
+
+    try:
+        await page.goto(URLS["sutran"], timeout=TIMEOUT, wait_until="domcontentloaded")
+        await asyncio.sleep(2)
+
+        # Seleccionar criterio "Placa" si hay un selector de tipo
+        tipo_selector = page.locator("select[name*='tipo' i], select[id*='tipo' i], select[id*='criterio' i]")
+        if await tipo_selector.count() > 0:
+            await tipo_selector.first.select_option(label="Placa")
+            await asyncio.sleep(0.5)
+
+        # Campo placa
+        campo = page.locator(
+            "input[id*='plac' i], input[name*='plac' i], "
+            "input[placeholder*='plac' i], input[type='text']"
+        )
+        await campo.first.wait_for(state="visible", timeout=TIMEOUT)
+        await campo.first.fill(placa.upper().strip())
+
+        # Botón consultar
+        btn = page.locator(
+            "button:has-text('Consultar'), button:has-text('Buscar'), "
+            "input[type='submit'], button[type='submit']"
+        )
+        await btn.first.click()
+        await asyncio.sleep(3)
+
+        # Esperar resultado o mensaje "sin infracciones"
+        await page.wait_for_selector(
+            "table, .resultado, #resultado, .alert, .mensaje, p:has-text('No')",
+            timeout=TIMEOUT
+        )
+
+        # Verificar mensaje "sin infracciones"
+        texto_pagina = await page.content()
+        palabras_sin_infraccion = [
+            "no registra infracciones", "sin infracciones",
+            "no tiene infracciones", "no se encontraron"
+        ]
+        if any(p in texto_pagina.lower() for p in palabras_sin_infraccion):
+            resultado.marcar_ok({"infracciones": [], "resumen": "✅ Sin infracciones registradas"})
+            return resultado
+
+        # Extraer tabla de infracciones
+        infracciones = []
+        filas = await page.locator("table tbody tr").all()
+
+        for fila in filas:
+            celdas = await fila.locator("td").all()
+            textos = [await c.inner_text() for c in celdas]
+            textos = [t.strip() for t in textos if t.strip()]
+            if textos:
+                infracciones.append(textos)
+
+        # Obtener encabezados de columnas
+        headers = []
+        ths = await page.locator("table thead th, table tr:first-child th").all()
+        for th in ths:
+            headers.append((await th.inner_text()).strip())
+
+        # Convertir a lista de dicts si hay headers
+        infracciones_dict = []
+        if headers and infracciones:
+            for fila in infracciones:
+                item = {}
+                for i, h in enumerate(headers):
+                    item[h] = fila[i] if i < len(fila) else ""
+                infracciones_dict.append(item)
+        else:
+            infracciones_dict = [{"detalle": " | ".join(f)} for f in infracciones]
+
+        if infracciones_dict:
+            resultado.marcar_advertencia(
+                {"infracciones": infracciones_dict, "total": len(infracciones_dict)},
+                f"⚠️ Se encontraron {len(infracciones_dict)} infracción(es) en SUTRAN."
+            )
+        else:
+            resultado.marcar_ok({"infracciones": [], "resumen": "✅ Sin infracciones registradas"})
+
+    except PWTimeout:
+        resultado.marcar_error("Tiempo de espera agotado al consultar SUTRAN.")
+    except Exception as exc:
+        resultado.marcar_error(f"Error inesperado: {exc}")
+
+    return resultado
+
+"""
+tacna.py — Papeletas Municipalidad de Tacna.
+URL: https://www.munitacna.gob.pe/pagina/sf/servicios/papeletas
+"""
+from playwright.async_api import Page
+from config import URLS
+from scrapers.papeleta_base import consultar_papeleta
+
+async def consultar(page: Page, placa: str):
+    return await consultar_papeleta(
+        page=page, url=URLS["tacna"], ciudad="Tacna", placa=placa,
+        selector_tipo="select[id*='tipo' i], select[name*='tipo' i]",
+        valor_tipo="PLACA",
+        espera_extra=2.5,
+    )
+
+"""
+tarapoto.py — Papeletas SAT Tarapoto.
+URL: https://www.sat-t.gob.pe/
+"""
+from playwright.async_api import Page
+from config import URLS
+from scrapers.papeleta_base import consultar_papeleta
+
+async def consultar(page: Page, placa: str):
+    return await consultar_papeleta(
+        page=page, url=URLS["tarapoto"], ciudad="Tarapoto (SAT)", placa=placa,
+        espera_extra=2.5,
+    )
+
+"""
+trujillo.py -- Papeletas SAT Trujillo (SATT).
+URL: https://satt.gob.pe/servicios/record-de-infracciones
+
+Flujo de 2 pasos:
+  Paso 1: Ingresar DNI + Celular + Correo  -> Click "CONSULTAR"
+  Paso 2: En la pagina "RECORD DE INFRACCIONES - SATT"
+          Ingresar PLACA -> Click "BUSCAR"
+          Extraer listado de infracciones.
+
+Credenciales en .env:
+  TRUJILLO_DNI      = 45975202
+  TRUJILLO_CELULAR  = 969762557
+  TRUJILLO_CORREO   = informesautoescuela@gmail.com
+"""
+import asyncio
+from playwright.async_api import Page, TimeoutError as PWTimeout
+from config import URLS, TIMEOUT, TRUJILLO_DNI, TRUJILLO_CELULAR, TRUJILLO_CORREO
+from scrapers.base import ResultadoConsulta
+
+
+# Palabras que indican que NO hay infracciones
+PALABRAS_LIMPIO = [
+    "no registra", "sin infracciones", "no tiene infracciones",
+    "no se encontraron", "no hay infracciones", "0 infraccion",
+    "sin multas", "no presenta", "sin papeletas",
+]
+
+# Palabras que indican que SI hay infracciones
+PALABRAS_INFRACCION = [
+    "infraccion", "infracción", "multa", "papeleta",
+    "monto", "deuda", "s/.", "pendiente", "fecha",
+]
+
+
+async def consultar(page: Page, placa: str) -> ResultadoConsulta:
+    """Consulta papeletas en SAT Trujillo usando flujo de 2 pasos."""
+
+    resultado = ResultadoConsulta(
+        fuente="Papeletas -- Trujillo (SATT)",
+        url=URLS["trujillo"]
+    )
+
+    # Validar credenciales antes de intentar
+    if not TRUJILLO_DNI or not TRUJILLO_CELULAR or not TRUJILLO_CORREO:
+        resultado.marcar_sin_datos(
+            "Credenciales SAT Trujillo no configuradas. "
+            "Agrega TRUJILLO_DNI, TRUJILLO_CELULAR y TRUJILLO_CORREO en .env"
+        )
+        return resultado
+
+    placa_upper = placa.upper().strip()
+
+    try:
+        # ── PASO 1: Formulario de identificacion ──────────────────────────────
+        await page.goto(URLS["trujillo"], timeout=TIMEOUT, wait_until="domcontentloaded")
+        await asyncio.sleep(2.5)
+
+        # Detectar captcha
+        captcha = await page.locator("iframe[src*='recaptcha'], div.g-recaptcha").count()
+        if captcha > 0:
+            print("  [TRUJILLO] CAPTCHA detectado -- resuelve manualmente y espera...")
+            await asyncio.sleep(30)
+
+        # Campo DNI
+        sel_dni = (
+            "input[id*='dni' i], input[name*='dni' i], "
+            "input[placeholder*='dni' i], input[placeholder*='documento' i]"
+        )
+        dni_campo = page.locator(sel_dni)
+        if await dni_campo.count() == 0:
+            resultado.marcar_error("No se encontro el campo DNI en SATT Trujillo.")
+            return resultado
+        await dni_campo.first.fill("")
+        await dni_campo.first.fill(str(TRUJILLO_DNI))
+        await asyncio.sleep(0.4)
+
+        # Campo Celular
+        sel_cel = (
+            "input[id*='celular' i], input[name*='celular' i], "
+            "input[placeholder*='celular' i], input[placeholder*='telefono' i], "
+            "input[id*='phone' i], input[type='tel']"
+        )
+        cel_campo = page.locator(sel_cel)
+        if await cel_campo.count() > 0:
+            await cel_campo.first.fill("")
+            await cel_campo.first.fill(str(TRUJILLO_CELULAR))
+            await asyncio.sleep(0.4)
+
+        # Campo Correo
+        sel_email = (
+            "input[id*='correo' i], input[name*='correo' i], "
+            "input[placeholder*='correo' i], input[type='email'], "
+            "input[id*='email' i], input[name*='email' i]"
+        )
+        email_campo = page.locator(sel_email)
+        if await email_campo.count() > 0:
+            await email_campo.first.fill("")
+            await email_campo.first.fill(str(TRUJILLO_CORREO))
+            await asyncio.sleep(0.4)
+
+        # Boton CONSULTAR (paso 1)
+        sel_btn_consultar = (
+            "button:has-text('Consultar'), "
+            "button:has-text('CONSULTAR'), "
+            "input[value*='Consultar' i], "
+            "button[type='submit'], "
+            "input[type='submit']"
+        )
+        btn_consultar = page.locator(sel_btn_consultar)
+        if await btn_consultar.count() == 0:
+            resultado.marcar_error("No se encontro el boton CONSULTAR en SATT Trujillo.")
+            return resultado
+
+        await btn_consultar.first.click()
+        await asyncio.sleep(3.5)  # Esperar carga de la segunda pantalla
+
+        # ── PASO 2: Busqueda por placa ────────────────────────────────────────
+        # Verificar que llegamos a la pagina de RECORD DE INFRACCIONES
+        url_actual = page.url
+        titulo_pagina = await page.title()
+        texto_pagina  = (await page.locator("body").inner_text()).lower()
+
+        # Detectar si hay error de autenticacion
+        if any(p in texto_pagina for p in ["error", "invalido", "incorrecto", "no valido"]):
+            if not any(p in texto_pagina for p in ["placa", "infracc", "buscar"]):
+                resultado.marcar_error(
+                    "Error de autenticacion en SATT Trujillo. "
+                    "Verifica DNI/Celular/Correo en .env"
+                )
+                return resultado
+
+        # Campo de placa (segunda pantalla)
+        sel_placa = (
+            "input[id*='plac' i], input[name*='plac' i], "
+            "input[placeholder*='plac' i], "
+            "input[id*='nro' i], input[name*='nro' i], "
+            "input[id*='vehic' i], input[type='text']"
+        )
+        placa_campo = page.locator(sel_placa)
+
+        # Esperar que aparezca el campo placa (puede tardar un poco)
+        try:
+            await placa_campo.first.wait_for(state="visible", timeout=15000)
+        except PWTimeout:
+            resultado.marcar_error(
+                "No aparecio el campo de placa en SATT Trujillo. "
+                "Posible error de autenticacion o CAPTCHA pendiente."
+            )
+            return resultado
+
+        await placa_campo.first.fill("")
+        await placa_campo.first.fill(placa_upper)
+        await asyncio.sleep(0.5)
+
+        # Boton BUSCAR (paso 2)
+        sel_btn_buscar = (
+            "button:has-text('Buscar'), "
+            "button:has-text('BUSCAR'), "
+            "input[value*='Buscar' i], "
+            "button[type='submit'], "
+            "input[type='submit'], "
+            "a:has-text('Buscar')"
+        )
+        btn_buscar = page.locator(sel_btn_buscar)
+        if await btn_buscar.count() == 0:
+            resultado.marcar_error("No se encontro el boton BUSCAR en SATT Trujillo.")
+            return resultado
+
+        await btn_buscar.first.click()
+        await asyncio.sleep(4.0)  # Esperar carga de resultados
+
+        # ── EXTRACCION DE RESULTADOS ──────────────────────────────────────────
+        texto_resultado = (await page.locator("body").inner_text()).lower()
+
+        # Verificar si no hay infracciones
+        sin_infraccion = any(p in texto_resultado for p in PALABRAS_LIMPIO)
+        con_infraccion = any(p in texto_resultado for p in PALABRAS_INFRACCION)
+
+        if sin_infraccion and not con_infraccion:
+            resultado.marcar_ok({
+                "Ciudad"  : "Trujillo (SATT)",
+                "Placa"   : placa_upper,
+                "Estado"  : "Sin infracciones",
+                "Resumen" : "El vehiculo no registra infracciones en el SAT Trujillo.",
+            })
+            return resultado
+
+        # Intentar extraer tabla de infracciones
+        infracciones = []
+
+        # Obtener cabeceras
+        headers = []
+        ths = await page.locator("table thead th, table tr:first-child th").all()
+        for th in ths:
+            h = (await th.inner_text()).strip()
+            if h:
+                headers.append(h)
+
+        # Obtener filas
+        filas = await page.locator("table tbody tr").all()
+        for fila in filas:
+            celdas = await fila.locator("td").all()
+            valores = [(await c.inner_text()).strip() for c in celdas]
+            valores = [v for v in valores if v]  # quitar vacios
+            if not valores:
+                continue
+            if headers and len(headers) == len(valores):
+                infracciones.append(dict(zip(headers, valores)))
+            elif valores:
+                # Mapeo generico si no hay cabeceras
+                claves_gen = [
+                    "Numero", "Fecha", "Codigo", "Descripcion",
+                    "Monto", "Estado", "Placa"
+                ]
+                fila_dict = {}
+                for idx, val in enumerate(valores):
+                    clave = claves_gen[idx] if idx < len(claves_gen) else "Col{}".format(idx+1)
+                    fila_dict[clave] = val
+                infracciones.append(fila_dict)
+
+        if infracciones:
+            resultado.marcar_advertencia(
+                {
+                    "Ciudad"       : "Trujillo (SATT)",
+                    "Placa"        : placa_upper,
+                    "infracciones" : infracciones,
+                    "total"        : len(infracciones),
+                },
+                "El vehiculo tiene {} infraccion(es) registrada(s) en SAT Trujillo.".format(
+                    len(infracciones)
+                )
+            )
+
+        elif con_infraccion:
+            # Hay texto de infraccion pero no tabla estructurada
+            lineas = [
+                l.strip()
+                for l in (await page.locator("body").inner_text()).split("\n")
+                if any(p in l.lower() for p in PALABRAS_INFRACCION) and l.strip()
+            ]
+            resultado.marcar_advertencia(
+                {
+                    "Ciudad"  : "Trujillo (SATT)",
+                    "Placa"   : placa_upper,
+                    "detalle" : " | ".join(lineas[:8]),
+                },
+                "Se detectaron posibles infracciones en SAT Trujillo. Verifica el portal."
+            )
+
+        else:
+            resultado.marcar_sin_datos(
+                "No se pudo determinar el estado de infracciones en SAT Trujillo. "
+                "Verifica el portal directamente: {}".format(URLS["trujillo"])
+            )
+
+    except PWTimeout:
+        resultado.marcar_error(
+            "Tiempo de espera agotado en SAT Trujillo. "
+            "El portal puede estar lento o requerir CAPTCHA manual."
+        )
+    except Exception as exc:
+        resultado.marcar_error("Error en SAT Trujillo: {}".format(str(exc)[:300]))
+
+    return resultado
+
+
+"""
+extractor_placas.py -- Extrae placas peruanas de archivos Excel, Word y PDF.
+
+Formatos validos de placa peruana:
+  ABC-123  |  ABC123  |  B1N-553  |  D6R-678
+  Las placas peruanas SIEMPRE comienzan con una LETRA.
+
+Retorna lista de placas unicas detectadas, en mayusculas, sin guiones.
+"""
+import re
+import io
+from pathlib import Path
+
+# Placa peruana: SIEMPRE empieza con letra, luego mezcla alfanum, termina en 2-3 digitos
+# Ejemplos: ABC123, B1N553, D6R678, A8R215, ABC-123
+PLACA_RE = re.compile(
+    r'\b([A-Z][A-Z0-9]{1,2}[-\s]?[A-Z0-9]{0,2}[-\s]?[0-9]{2,3})\b',
+    re.IGNORECASE
+)
+
+# Patron estricto post-limpieza: 5-6 chars alfanum
+PLACA_ESTRICTA = re.compile(r'^[A-Z][A-Z0-9]{1,2}[0-9A-Z]{2,3}$')
+
+# Palabras a ignorar
+IGNORAR = {
+    "DNI", "RUC", "NUM", "NRO", "COD", "REF", "TEL",
+    "FAX", "CEL", "ANO", "AYO", "URL", "PDF", "XML",
+}
+
+
+def _limpiar(placa_raw: str) -> str:
+    """Elimina espacios y guiones, convierte a mayusculas."""
+    return re.sub(r'[\s\-]', '', placa_raw.strip().upper())
+
+
+def _es_placa_valida(token: str) -> bool:
+    """Valida que el token tenga forma de placa peruana."""
+    limpia = _limpiar(token)
+    if len(limpia) < 5 or len(limpia) > 6:
+        return False
+    if limpia in IGNORAR:
+        return False
+    if not limpia[0].isalpha():
+        return False
+    letras  = sum(1 for c in limpia if c.isalpha())
+    digitos = sum(1 for c in limpia if c.isdigit())
+    if letras < 2 or digitos < 2:
+        return False
+    return bool(PLACA_ESTRICTA.match(limpia))
+
+
+def _normalizar_celda(valor) -> str:
+    """Convierte cualquier valor de celda a string limpio."""
+    if valor is None:
+        return ""
+    return str(valor).strip()
+
+
+def extraer_de_texto(texto: str) -> list:
+    """Extrae placas de un string de texto plano."""
+    candidatos = PLACA_RE.findall(texto)
+    placas = []
+    vistas = set()
+    for c in candidatos:
+        limpia = _limpiar(c)
+        if _es_placa_valida(limpia) and limpia not in vistas:
+            placas.append(limpia)
+            vistas.add(limpia)
+    return placas
+
+
+def extraer_de_excel(contenido: bytes) -> list:
+    """
+    Extrae placas de un archivo Excel (.xlsx / .xls).
+    Estrategia: procesa cada celda individualmente para evitar
+    que el numero de fila se concatene con la placa.
+    """
+    vistas = set()
+    placas = []
+
+    def _procesar_valor(val):
+        s = _normalizar_celda(val)
+        if not s:
+            return
+        # Intentar como placa exacta primero
+        limpia = _limpiar(s)
+        if _es_placa_valida(limpia) and limpia not in vistas:
+            placas.append(limpia)
+            vistas.add(limpia)
+            return
+        # Si la celda tiene texto largo, buscar placas dentro
+        if len(s) > 7:
+            for c in PLACA_RE.findall(s):
+                limpia2 = _limpiar(c)
+                if _es_placa_valida(limpia2) and limpia2 not in vistas:
+                    placas.append(limpia2)
+                    vistas.add(limpia2)
+
+    try:
+        import openpyxl
+        wb = openpyxl.load_workbook(io.BytesIO(contenido), data_only=True)
+        for sheet in wb.worksheets:
+            for row in sheet.iter_rows(values_only=True):
+                for celda in row:
+                    _procesar_valor(celda)
+        return placas
+    except Exception:
+        pass
+
+    try:
+        import xlrd
+        book = xlrd.open_workbook(file_contents=contenido)
+        for sheet in book.sheets():
+            for r in range(sheet.nrows):
+                for c in range(sheet.ncols):
+                    _procesar_valor(sheet.cell_value(r, c))
+        return placas
+    except Exception as e:
+        raise ValueError("No se pudo leer el Excel: {}".format(e))
+
+
+def extraer_de_word(contenido: bytes) -> list:
+    """Extrae placas de un archivo Word (.docx)."""
+    try:
+        from docx import Document
+        doc = Document(io.BytesIO(contenido))
+        partes = []
+        for parrafo in doc.paragraphs:
+            partes.append(parrafo.text)
+        for tabla in doc.tables:
+            for fila in tabla.rows:
+                for celda in fila.cells:
+                    partes.append(celda.text)
+        return extraer_de_texto(" ".join(partes))
+    except Exception as e:
+        raise ValueError("No se pudo leer el Word: {}".format(e))
+
+
+def extraer_de_pdf(contenido: bytes) -> list:
+    """Extrae placas de un archivo PDF."""
+    try:
+        import pdfplumber
+        texto_total = ""
+        with pdfplumber.open(io.BytesIO(contenido)) as pdf:
+            for pagina in pdf.pages:
+                t = pagina.extract_text()
+                if t:
+                    texto_total += " " + t
+        return extraer_de_texto(texto_total)
+    except Exception as e:
+        raise ValueError("No se pudo leer el PDF: {}".format(e))
+
+
+def extraer_placas(nombre_archivo: str, contenido: bytes) -> list:
+    """
+    Entrada principal. Detecta el tipo de archivo y extrae placas.
+
+    Args:
+        nombre_archivo : Nombre del archivo (para detectar extension).
+        contenido      : Bytes del archivo.
+
+    Returns:
+        Lista de placas unicas en mayusculas sin guiones. Ej: ["D6R678", "B1N553"]
+
+    Raises:
+        ValueError si el formato no es soportado.
+    """
+    ext = Path(nombre_archivo).suffix.lower()
+
+    if ext in (".xlsx", ".xls"):
+        return extraer_de_excel(contenido)
+    elif ext in (".docx", ".doc"):
+        return extraer_de_word(contenido)
+    elif ext == ".pdf":
+        return extraer_de_pdf(contenido)
+    elif ext in (".txt", ".csv"):
+        return extraer_de_texto(contenido.decode("utf-8", errors="replace"))
+    else:
+        raise ValueError(
+            "Formato no soportado: '{}'. "
+            "Usa Excel (.xlsx), Word (.docx), PDF (.pdf) o TXT/CSV.".format(ext)
+        )
+
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Verificador Vehicular Peru</title>
+  <style>
+    :root{
+      --azul:#1a365d;--azul2:#2b6cb0;--azul3:#ebf8ff;
+      --verde:#276749;--verde2:#c6f6d5;
+      --rojo:#c53030;--rojo2:#fed7d7;
+      --amarillo:#744210;--amarillo2:#fefcbf;
+      --gris:#4a5568;--gris2:#718096;--gris3:#e2e8f0;
+      --blanco:#ffffff;
+    }
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:#f7fafc;color:#2d3748}
+    .hero{background:linear-gradient(135deg,var(--azul) 0%,var(--azul2) 100%);padding:60px 20px 80px;text-align:center;color:white}
+    .hero-icon{font-size:64px;display:block;margin-bottom:16px}
+    .hero h1{font-size:clamp(24px,5vw,42px);font-weight:900;letter-spacing:-0.5px;margin-bottom:12px}
+    .hero p{font-size:clamp(14px,2.5vw,18px);opacity:.9;max-width:640px;margin:0 auto 36px;line-height:1.6}
+    .form-card{background:white;border-radius:20px;padding:32px 28px;max-width:520px;margin:0 auto;box-shadow:0 20px 60px rgba(0,0,0,0.15)}
+    .form-label{display:block;font-size:13px;font-weight:700;color:var(--azul);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px}
+    .form-input-wrap{display:flex;gap:10px;margin-bottom:8px}
+    .form-input{flex:1;padding:14px 18px;border:2px solid var(--gris3);border-radius:12px;font-size:17px;font-weight:700;letter-spacing:2px;text-transform:uppercase;outline:none;transition:border-color .2s}
+    .form-input:focus{border-color:var(--azul2)}
+    .btn-verificar{padding:14px 22px;background:linear-gradient(135deg,var(--azul),var(--azul2));color:white;border:none;border-radius:12px;font-size:15px;font-weight:800;cursor:pointer;white-space:nowrap;transition:opacity .2s}
+    .btn-verificar:hover{opacity:.9}
+    .form-hint{font-size:11px;color:var(--gris2);text-align:center;margin-top:4px}
+    .error-msg{background:var(--rojo2);color:var(--rojo);border:1px solid #fc8181;border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:14px;font-weight:600}
+
+    /* ── TABS ── */
+    .tabs{display:flex;gap:0;margin-bottom:20px;border-radius:10px;overflow:hidden;border:2px solid var(--gris3)}
+    .tab{flex:1;padding:11px 10px;text-align:center;font-size:13px;font-weight:700;cursor:pointer;background:var(--gris3);color:var(--gris);border:none;transition:all .2s}
+    .tab.activo{background:var(--azul2);color:white}
+    .panel{display:none}
+    .panel.activo{display:block}
+
+    /* ── Zona de carga masiva ── */
+    .drop-zone{border:2px dashed rgba(43,108,176,0.4);border-radius:12px;padding:30px 20px;text-align:center;cursor:pointer;transition:all .2s;margin-bottom:14px;background:var(--azul3)}
+    .drop-zone:hover,.drop-zone.drag-over{border-color:var(--azul2);background:#dbeafe}
+    .drop-icon{font-size:36px;display:block;margin-bottom:8px}
+    .drop-label{font-size:14px;font-weight:600;color:var(--azul);margin-bottom:4px}
+    .drop-hint{font-size:11px;color:var(--gris2)}
+    #inputArchivo{display:none}
+    .placas-detectadas{display:none;margin-top:14px}
+    .placas-titulo{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--gris2);margin-bottom:8px}
+    .placas-grid{display:flex;flex-wrap:wrap;gap:7px;max-height:160px;overflow-y:auto;margin-bottom:14px}
+    .placa-tag{background:var(--azul3);color:var(--azul2);border:1px solid #bee3f8;border-radius:6px;padding:4px 10px;font-size:13px;font-weight:700;letter-spacing:1.5px;display:flex;align-items:center;gap:5px}
+    .placa-tag .remove{cursor:pointer;color:#a0aec0;font-size:15px;line-height:1}
+    .placa-tag .remove:hover{color:var(--rojo)}
+    .btn-iniciar{width:100%;padding:13px;background:linear-gradient(135deg,var(--azul),var(--azul2));color:white;border:none;border-radius:10px;font-size:15px;font-weight:800;cursor:pointer;transition:opacity .2s}
+    .btn-iniciar:hover{opacity:.9}
+    .btn-iniciar:disabled{opacity:.5;cursor:not-allowed}
+    .cargando-msg{font-size:12px;color:var(--gris2);text-align:center;margin-top:8px;min-height:16px}
+    .limite-msg{font-size:11px;color:var(--gris2);margin-top:6px;text-align:right}
+
+    /* Resto de la pagina */
+    .fuentes{padding:60px 20px;max-width:960px;margin:0 auto}
+    .fuentes h2{font-size:24px;font-weight:800;color:var(--azul);text-align:center;margin-bottom:8px}
+    .fuentes-sub{text-align:center;color:var(--gris2);font-size:14px;margin-bottom:36px}
+    .fuentes-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px}
+    .fuente-card{background:white;border-radius:14px;padding:20px;border:1px solid var(--gris3);transition:box-shadow .2s}
+    .fuente-card:hover{box-shadow:0 4px 20px rgba(0,0,0,0.08)}
+    .fuente-icon{font-size:28px;margin-bottom:10px}
+    .fuente-nombre{font-size:13px;font-weight:700;color:var(--azul);margin-bottom:4px}
+    .fuente-desc{font-size:12px;color:var(--gris2);line-height:1.5}
+    .como{background:var(--azul);color:white;padding:60px 20px;text-align:center}
+    .como h2{font-size:24px;font-weight:800;margin-bottom:40px}
+    .pasos{display:flex;gap:24px;justify-content:center;flex-wrap:wrap;max-width:800px;margin:0 auto}
+    .paso{background:rgba(255,255,255,0.1);border-radius:16px;padding:24px;width:200px}
+    .paso-num{font-size:36px;font-weight:900;color:rgba(255,255,255,0.3);margin-bottom:8px}
+    .paso-titulo{font-size:14px;font-weight:700;margin-bottom:6px}
+    .paso-desc{font-size:12px;opacity:.8;line-height:1.5}
+    footer{background:var(--azul);color:rgba(255,255,255,0.7);text-align:center;padding:24px 20px;font-size:12px;margin-top:1px}
+  </style>
+</head>
+<body>
+
+<section class="hero">
+  <span class="hero-icon">&#x1F697;</span>
+  <h1>Verificador Vehicular Peru</h1>
+  <p>Consulta 20 fuentes oficiales antes de comprar un auto usado. Documentacion, deudas, papeletas e inspeccion tecnica en un solo reporte.</p>
+
+  <div class="form-card">
+    {% if error %}
+    <div class="error-msg">&#x26A0;&#xFE0F; {{ error }}</div>
+    {% endif %}
+
+    <!-- Pestanas -->
+    <div class="tabs">
+      <button class="tab activo" onclick="cambiarTab('individual',this)">&#x1F50D; Consulta Individual</button>
+      <button class="tab" onclick="cambiarTab('masivo',this)">&#x1F4CB; Carga Masiva</button>
+    </div>
+
+    <!-- Panel individual -->
+    <div class="panel activo" id="panel-individual">
+      <label class="form-label">Ingresa la placa del vehiculo</label>
+      <form method="POST" action="/consultar">
+        <div class="form-input-wrap">
+          <input class="form-input" type="text" name="placa"
+                 placeholder="Ej: B1N553"
+                 maxlength="8" autocomplete="off" autofocus
+                 pattern="[A-Za-z0-9\-\s]{5,8}" required/>
+          <button class="btn-verificar" type="submit">
+            &#x1F50D; Verificar
+          </button>
+        </div>
+        <p class="form-hint">Formatos validos: B1N553 &middot; ABC123 &middot; A8R-215</p>
+      </form>
+    </div>
+
+    <!-- Panel masivo -->
+    <div class="panel" id="panel-masivo">
+      <label class="form-label">Sube tu archivo con las placas</label>
+      <div class="drop-zone" id="dropZone" onclick="document.getElementById('inputArchivo').click()">
+        <span class="drop-icon">&#x1F4C2;</span>
+        <div class="drop-label">Arrastra tu archivo o haz clic para seleccionar</div>
+        <div class="drop-hint">Excel (.xlsx) &middot; Word (.docx) &middot; PDF (.pdf) &middot; Max. 100 placas</div>
+      </div>
+      <input type="file" id="inputArchivo" accept=".xlsx,.xls,.docx,.doc,.pdf,.txt,.csv"/>
+      <div id="msgCargando" class="cargando-msg"></div>
+
+      <div class="placas-detectadas" id="placasDetectadas">
+        <div class="placas-titulo">Placas detectadas &mdash; <span id="totalDetectadas">0</span></div>
+        <div class="placas-grid" id="gridPlacas"></div>
+        <p class="limite-msg">Se procesaran en orden, una a la vez.</p>
+        <button class="btn-iniciar" id="btnIniciar" onclick="iniciarMasivo()">
+          &#x1F680; Iniciar Verificacion Masiva
+        </button>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<section class="fuentes">
+  <h2>&#x1F4CB; 20 Fuentes Oficiales Consultadas</h2>
+  <p class="fuentes-sub">Revisamos todos los registros que importan antes de la compra.</p>
+  <div class="fuentes-grid">
+    <div class="fuente-card"><div class="fuente-icon">&#x1F3E6;</div><div class="fuente-nombre">SUNARP Vehicular</div><div class="fuente-desc">Titularidad, gravamenes, bloqueos registrales y estado legal del vehiculo.</div></div>
+    <div class="fuente-card"><div class="fuente-icon">&#x1F6E1;&#xFE0F;</div><div class="fuente-nombre">SOAT APESEG</div><div class="fuente-desc">Vigencia del Seguro Obligatorio de Accidentes de Transito.</div></div>
+    <div class="fuente-card"><div class="fuente-icon">&#x1F527;</div><div class="fuente-nombre">MTC Inspeccion Tecnica</div><div class="fuente-desc">Historial de revisiones tecnicas vehiculares.</div></div>
+    <div class="fuente-card"><div class="fuente-icon">&#x1F4DC;</div><div class="fuente-nombre">SUNARP SPRL</div><div class="fuente-desc">Historial completo de propietarios anteriores.</div></div>
+    <div class="fuente-card"><div class="fuente-icon">&#x1F9FE;</div><div class="fuente-nombre">SUNARP Siguelo+</div><div class="fuente-desc">Estado de cargas y gravamenes actuales sobre el titulo.</div></div>
+    <div class="fuente-card"><div class="fuente-icon">&#x1F6A6;</div><div class="fuente-nombre">SUTRAN</div><div class="fuente-desc">Infracciones de transporte y sanciones a nivel nacional.</div></div>
+    <div class="fuente-card"><div class="fuente-icon">&#x1F68C;</div><div class="fuente-nombre">ATU Lima</div><div class="fuente-desc">Multas de transporte urbano en la capital.</div></div>
+    <div class="fuente-card"><div class="fuente-icon">&#x1F3E5;</div><div class="fuente-nombre">SBS Accidentes SOAT</div><div class="fuente-desc">Siniestros registrados en el sistema de seguros.</div></div>
+    <div class="fuente-card"><div class="fuente-icon">&#x1F6DF;</div><div class="fuente-nombre">Callao &amp; GNV/FISE</div><div class="fuente-desc">Papeletas del Callao y deuda de conversion GNV.</div></div>
+    <div class="fuente-card"><div class="fuente-icon">&#x1F4CD;</div><div class="fuente-nombre">10 Municipalidades Regionales</div><div class="fuente-desc">Trujillo, Piura, Chiclayo, Arequipa, Tacna, Ica, Cajamarca, Huancayo, Chachapoyas y Tarapoto.</div></div>
+  </div>
+</section>
+
+<section class="como">
+  <h2>Como funciona</h2>
+  <div class="pasos">
+    <div class="paso"><div class="paso-num">1</div><div class="paso-titulo">Ingresa la placa</div><div class="paso-desc">Escribe la placa del vehiculo que deseas verificar.</div></div>
+    <div class="paso"><div class="paso-num">2</div><div class="paso-titulo">Consulta automatica</div><div class="paso-desc">Consultamos 20 fuentes oficiales en tiempo real.</div></div>
+    <div class="paso"><div class="paso-num">3</div><div class="paso-titulo">Inspeccion visual</div><div class="paso-desc">Completa el checklist de 45 puntos de inspeccion.</div></div>
+    <div class="paso"><div class="paso-num">4</div><div class="paso-titulo">Veredicto final</div><div class="paso-desc">Obtenes un reporte completo y recomendaciones de compra.</div></div>
+  </div>
+</section>
+
+<footer>
+  <p>Verificador Vehicular Peru &mdash; Herramienta de apoyo para la compra informada de vehiculos usados.</p>
+  <p style="margin-top:6px">Los datos provienen de fuentes oficiales pero pueden no estar actualizados al momento de la consulta.</p>
+</footer>
+
+<script>
+// Tabs
+function cambiarTab(id, btn) {
+  document.querySelectorAll(".tab").forEach(function(t){ t.classList.remove("activo"); });
+  document.querySelectorAll(".panel").forEach(function(p){ p.classList.remove("activo"); });
+  btn.classList.add("activo");
+  document.getElementById("panel-" + id).classList.add("activo");
+}
+
+// Drag & drop
+var dz = document.getElementById("dropZone");
+dz.addEventListener("dragover", function(e){ e.preventDefault(); dz.classList.add("drag-over"); });
+dz.addEventListener("dragleave", function(){ dz.classList.remove("drag-over"); });
+dz.addEventListener("drop", function(e){
+  e.preventDefault();
+  dz.classList.remove("drag-over");
+  var f = e.dataTransfer.files[0];
+  if (f) procesarArchivo(f);
+});
+document.getElementById("inputArchivo").addEventListener("change", function(e){
+  if (e.target.files[0]) procesarArchivo(e.target.files[0]);
+});
+
+var placasActuales = [];
+
+function procesarArchivo(archivo) {
+  var msg = document.getElementById("msgCargando");
+  msg.textContent = "Analizando archivo...";
+  document.getElementById("placasDetectadas").style.display = "none";
+  placasActuales = [];
+
+  var fd = new FormData();
+  fd.append("archivo", archivo);
+
+  fetch("/masivo/cargar", { method: "POST", body: fd })
+    .then(function(res){ return res.json(); })
+    .then(function(data){
+      if (data.error) {
+        msg.innerHTML = '<span style="color:#c53030">&#x26A0; ' + data.error + '</span>';
+        return;
+      }
+      placasActuales = data.placas;
+      msg.textContent = "";
+      renderPlacas(placasActuales);
+    })
+    .catch(function(){
+      msg.innerHTML = '<span style="color:#c53030">&#x26A0; Error al procesar el archivo.</span>';
+    });
+}
+
+function renderPlacas(placas) {
+  var grid = document.getElementById("gridPlacas");
+  grid.innerHTML = "";
+  document.getElementById("totalDetectadas").textContent = placas.length;
+  placas.forEach(function(p){
+    var tag = document.createElement("div");
+    tag.className = "placa-tag";
+    tag.id = "tag-" + p;
+    tag.innerHTML = p + '<span class="remove" onclick="quitarPlaca(\'' + p + '\')">&times;</span>';
+    grid.appendChild(tag);
+  });
+  document.getElementById("placasDetectadas").style.display = "block";
+  document.getElementById("btnIniciar").disabled = placas.length === 0;
+}
+
+function quitarPlaca(p) {
+  placasActuales = placasActuales.filter(function(x){ return x !== p; });
+  var tag = document.getElementById("tag-" + p);
+  if (tag) tag.remove();
+  document.getElementById("totalDetectadas").textContent = placasActuales.length;
+  document.getElementById("btnIniciar").disabled = placasActuales.length === 0;
+}
+
+function iniciarMasivo() {
+  if (!placasActuales.length) return;
+  var btn = document.getElementById("btnIniciar");
+  btn.disabled = true;
+  btn.textContent = "Iniciando...";
+
+  fetch("/masivo/iniciar", {
+    method: "POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({placas: placasActuales})
+  })
+  .then(function(res){ return res.json(); })
+  .then(function(data){
+    if (data.error) {
+      document.getElementById("msgCargando").innerHTML =
+        '<span style="color:#c53030">&#x26A0; ' + data.error + '</span>';
+      btn.disabled = false;
+      btn.textContent = "Iniciar Verificacion Masiva";
+      return;
+    }
+    window.location.href = "/masivo/" + data.bid;
+  })
+  .catch(function(){
+    document.getElementById("msgCargando").innerHTML =
+      '<span style="color:#c53030">&#x26A0; Error al iniciar. Intenta de nuevo.</span>';
+    btn.disabled = false;
+    btn.textContent = "Iniciar Verificacion Masiva";
+  });
+}
+</script>
+</body>
+</html>
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Verificación Masiva — {{ total }} placas</title>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --azul:#1a365d;--azul2:#2b6cb0;--azul3:#ebf4ff;
+      --verde:#276749;--verde2:#f0fff4;--verde3:#68d391;
+      --amarillo:#744210;--amarillo2:#fffbeb;--amarillo3:#f6ad55;
+      --rojo:#742a2a;--rojo2:#fff5f5;--rojo3:#fc8181;
+      --gris:#4a5568;--gris2:#718096;--gris3:#e2e8f0;--gris4:#f7fafc;
+    }
+    body{font-family:'Segoe UI',Arial,sans-serif;background:var(--gris4);color:#1a202c;min-height:100vh}
+
+    header{background:linear-gradient(135deg,var(--azul),var(--azul2));color:white;padding:18px 28px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+    header h1{font-size:17px;font-weight:700}
+    .badge-total{background:rgba(255,255,255,0.15);border:2px solid rgba(255,255,255,0.35);border-radius:8px;padding:6px 18px;font-size:15px;font-weight:700}
+
+    main{max-width:1000px;margin:28px auto;padding:0 16px 80px}
+
+    /* Barra de progreso global */
+    .prog-card{background:white;border-radius:14px;padding:24px 28px;box-shadow:0 2px 12px rgba(0,0,0,0.07);margin-bottom:24px}
+    .prog-card h2{font-size:16px;font-weight:700;color:var(--azul);margin-bottom:14px}
+    .bar-wrap{background:var(--gris3);border-radius:10px;height:14px;overflow:hidden;margin-bottom:10px}
+    .bar{height:100%;border-radius:10px;background:linear-gradient(90deg,var(--azul2),#3182ce);width:0%;transition:width .5s ease}
+    .prog-info{display:flex;justify-content:space-between;font-size:12px;color:var(--gris2)}
+    .estado-texto{margin-top:10px;font-size:13px;color:var(--gris);min-height:20px}
+    .spinner{display:inline-block;width:11px;height:11px;border:2px solid var(--azul3);border-top-color:var(--azul2);border-radius:50%;animation:spin .7s linear infinite;margin-right:5px}
+    @keyframes spin{to{transform:rotate(360deg)}}
+
+    /* Contadores de resumen */
+    .contadores{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:12px;margin-bottom:24px}
+    .contador{background:white;border-radius:10px;padding:14px 10px;text-align:center;box-shadow:0 1px 6px rgba(0,0,0,0.06)}
+    .contador .num{font-size:28px;font-weight:800;line-height:1}
+    .contador .lbl{font-size:10px;text-transform:uppercase;letter-spacing:.5px;margin-top:4px;color:var(--gris2)}
+    .c-ok .num{color:var(--verde)} .c-warn .num{color:var(--amarillo)}
+    .c-err .num{color:var(--rojo)} .c-proc .num{color:var(--azul2)}
+
+    /* Tabla de resultados */
+    .tabla-card{background:white;border-radius:14px;padding:22px 24px;box-shadow:0 2px 12px rgba(0,0,0,0.06)}
+    .tabla-card h2{font-size:15px;font-weight:700;color:var(--azul);margin-bottom:16px}
+    table{width:100%;border-collapse:collapse;font-size:13px}
+    thead th{background:var(--azul);color:white;padding:9px 12px;text-align:left;font-weight:600;font-size:12px}
+    tbody tr{border-bottom:1px solid var(--gris3);transition:background .15s}
+    tbody tr:hover{background:var(--azul3)}
+    tbody td{padding:10px 12px;vertical-align:middle}
+    .placa-cell{font-weight:800;letter-spacing:2px;font-size:14px}
+    .estado-chip{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;white-space:nowrap}
+    .chip-ok{background:var(--verde2);color:var(--verde);border:1px solid #c6f6d5}
+    .chip-warn{background:var(--amarillo2);color:var(--amarillo);border:1px solid #fbd38d}
+    .chip-err{background:var(--rojo2);color:var(--rojo);border:1px solid #fed7d7}
+    .chip-proc{background:var(--azul3);color:var(--azul2);border:1px solid #bee3f8}
+    .chip-pend{background:var(--gris4);color:var(--gris2);border:1px solid var(--gris3)}
+    .btn-reporte{background:var(--azul2);color:white;border:none;padding:5px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;text-decoration:none;display:inline-block}
+    .btn-reporte:hover{background:var(--azul)}
+    .btn-reporte.disabled{background:var(--gris3);color:var(--gris2);cursor:not-allowed;pointer-events:none}
+
+    /* Botones de accion */
+    .acciones{display:flex;gap:12px;margin-top:20px;flex-wrap:wrap}
+    .btn{padding:11px 20px;border-radius:9px;font-size:13px;font-weight:700;cursor:pointer;border:none;text-decoration:none;display:inline-flex;align-items:center;gap:7px;transition:opacity .2s}
+    .btn:hover{opacity:.88}
+    .btn-primary{background:var(--azul2);color:white}
+    .btn-secondary{background:var(--gris3);color:var(--gris)}
+    .btn-excel{background:#276749;color:white}
+
+    @media(max-width:640px){table{font-size:11px} thead th,tbody td{padding:7px 8px}}
+    @media print{.no-print{display:none!important}}
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>📋 Verificación Masiva — Verificador Vehicular Perú</h1>
+  <div class="badge-total">{{ total }} placas en lote</div>
+</header>
+
+<main>
+
+  <!-- Progreso global -->
+  <div class="prog-card">
+    <h2>Progreso del lote</h2>
+    <div class="bar-wrap"><div class="bar" id="barGlobal"></div></div>
+    <div class="prog-info">
+      <span id="labelPaso">Iniciando...</span>
+      <span id="labelPct">0%</span>
+    </div>
+    <div class="estado-texto" id="estadoTexto">
+      <span class="spinner"></span> Preparando el lote de {{ total }} placas...
+    </div>
+  </div>
+
+  <!-- Contadores -->
+  <div class="contadores">
+    <div class="contador c-proc">
+      <div class="num" id="cntProc">0</div>
+      <div class="lbl">⏳ Procesadas</div>
+    </div>
+    <div class="contador c-ok">
+      <div class="num" id="cntOk">0</div>
+      <div class="lbl">✅ Sin problemas</div>
+    </div>
+    <div class="contador c-warn">
+      <div class="num" id="cntWarn">0</div>
+      <div class="lbl">⚠️ Con alertas</div>
+    </div>
+    <div class="contador c-err">
+      <div class="num" id="cntErr">0</div>
+      <div class="lbl">🚨 Con errores</div>
+    </div>
+  </div>
+
+  <!-- Tabla de resultados -->
+  <div class="tabla-card">
+    <h2>Resultados por placa</h2>
+    <table id="tablaResultados">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Placa</th>
+          <th>Estado</th>
+          <th>Sin probl.</th>
+          <th>Alertas</th>
+          <th>Errores</th>
+          <th>Reporte</th>
+        </tr>
+      </thead>
+      <tbody id="cuerpoTabla">
+        {% for placa in placas %}
+        <tr id="fila-{{ placa }}">
+          <td>{{ loop.index }}</td>
+          <td class="placa-cell">{{ placa }}</td>
+          <td><span class="estado-chip chip-pend">⏸ Pendiente</span></td>
+          <td>—</td>
+          <td>—</td>
+          <td>—</td>
+          <td><a class="btn-reporte disabled">— </a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <div class="acciones no-print">
+      <button class="btn btn-excel" id="btnExportar" onclick="exportarCSV()" disabled>
+        📊 Exportar a CSV
+      </button>
+      <button class="btn btn-primary" onclick="window.print()">🖨️ Imprimir</button>
+      <a class="btn btn-secondary" href="/">🔄 Nueva consulta</a>
+    </div>
+  </div>
+
+</main>
+
+<script>
+const BID   = "{{ bid }}";
+const TOTAL = {{ total }};
+let procesadas = 0, sinProbl = 0, alertas = 0, errores = 0;
+let loteTerminado = false;
+const resultadosFinales = [];
+
+const es = new EventSource("/api/masivo/stream/" + BID);
+
+es.onmessage = function(e) {
+  const ev = JSON.parse(e.data);
+
+  if (ev.tipo === "iniciando") {
+    const pct = Math.round((ev.num - 1) / TOTAL * 100);
+    document.getElementById("barGlobal").style.width = pct + "%";
+    document.getElementById("labelPct").textContent  = pct + "%";
+    document.getElementById("labelPaso").textContent =
+      "Placa " + ev.num + " de " + ev.total;
+    document.getElementById("estadoTexto").innerHTML =
+      '<span class="spinner"></span> Verificando: <strong>' + ev.placa + '</strong>';
+
+    // Marcar fila como en proceso
+    actualizarFila(ev.placa, "proceso", null);
+  }
+
+  else if (ev.tipo === "placa_lista") {
+    const r = ev.resumen;
+    procesadas++;
+    document.getElementById("cntProc").textContent = procesadas;
+
+    let estado;
+    if (r.error_msg) {
+      estado = "error";
+      errores++;
+    } else if (r.advertencia > 0) {
+      estado = "advertencia";
+      alertas++;
+    } else if (r.error > 0) {
+      estado = "error";
+      errores++;
+    } else {
+      estado = "ok";
+      sinProbl++;
+    }
+
+    document.getElementById("cntOk").textContent   = sinProbl;
+    document.getElementById("cntWarn").textContent  = alertas;
+    document.getElementById("cntErr").textContent   = errores;
+
+    actualizarFila(r.placa, estado, r);
+    resultadosFinales.push({placa: r.placa, estado, ...r});
+  }
+
+  else if (ev.tipo === "lote_listo") {
+    document.getElementById("barGlobal").style.width = "100%";
+    document.getElementById("labelPct").textContent  = "100%";
+    document.getElementById("labelPaso").textContent = "Lote completado";
+    document.getElementById("estadoTexto").textContent =
+      "✅ Todas las placas han sido verificadas.";
+    document.getElementById("btnExportar").disabled = false;
+    loteTerminado = true;
+    es.close();
+  }
+
+  else if (ev.tipo === "fin") { es.close(); }
+};
+
+es.onerror = function() {
+  if (!loteTerminado) {
+    document.getElementById("estadoTexto").innerHTML =
+      '<span style="color:var(--rojo)">⚠️ Conexión interrumpida. Recarga para reintentar.</span>';
+  }
+  es.close();
+};
+
+function actualizarFila(placa, estado, r) {
+  const fila = document.getElementById("fila-" + placa);
+  if (!fila) return;
+
+  const chips = {
+    ok        : '<span class="estado-chip chip-ok">✅ Sin problemas</span>',
+    advertencia: '<span class="estado-chip chip-warn">⚠️ Con alertas</span>',
+    error     : '<span class="estado-chip chip-err">🚨 Errores</span>',
+    proceso   : '<span class="estado-chip chip-proc"><span class="spinner"></span>Procesando</span>',
+  };
+
+  const celdas = fila.querySelectorAll("td");
+  celdas[2].innerHTML = chips[estado] || chips["proceso"];
+
+  if (r && estado !== "proceso") {
+    celdas[3].textContent = r.ok        !== undefined ? r.ok         : "—";
+    celdas[4].textContent = r.advertencia !== undefined ? r.advertencia : "—";
+    celdas[5].textContent = r.error     !== undefined ? r.error      : "—";
+    if (r.sid) {
+      celdas[6].innerHTML =
+        '<a class="btn-reporte" href="/reporte/' + r.sid + '" target="_blank">Ver reporte</a>';
+    }
+  }
+}
+
+function exportarCSV() {
+  const filas = [["#","Placa","Estado","Sin_problemas","Alertas","Errores","URL_Reporte"]];
+  resultadosFinales.forEach((r, i) => {
+    const url = r.sid ? window.location.origin + "/reporte/" + r.sid : "";
+    filas.push([i+1, r.placa, r.estado, r.ok||0, r.advertencia||0, r.error||0, url]);
+  });
+  const csv = filas.map(f => f.join(",")).join("\n");
+  const blob = new Blob(["﻿" + csv], {type:"text/csv;charset=utf-8"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "verificacion_masiva_" + new Date().toISOString().slice(0,10) + ".csv";
+  a.click();
+}
+</script>
+</body>
+</html>
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Verificando {{ placa }} — Verificador Vehicular Perú</title>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --azul:#1a365d;--azul2:#2b6cb0;--azul3:#ebf4ff;
+      --verde:#276749;--verde2:#f0fff4;--verde3:#68d391;
+      --amarillo:#744210;--amarillo2:#fffbeb;--amarillo3:#f6ad55;
+      --rojo:#742a2a;--rojo2:#fff5f5;--rojo3:#fc8181;
+      --gris:#4a5568;--gris2:#718096;--gris3:#e2e8f0;--gris4:#f7fafc;
+    }
+    body{font-family:'Segoe UI',Arial,sans-serif;background:var(--gris4);color:#1a202c;min-height:100vh}
+
+    /* ── HEADER ── */
+    header{background:linear-gradient(135deg,var(--azul),var(--azul2));color:white;padding:18px 28px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+    header h1{font-size:17px;font-weight:700}
+    .placa-badge{background:rgba(255,255,255,0.15);border:2px solid rgba(255,255,255,0.35);border-radius:8px;padding:6px 18px;font-size:22px;font-weight:900;letter-spacing:4px}
+
+    /* ── LAYOUT ── */
+    main{max-width:900px;margin:28px auto;padding:0 16px 80px}
+
+    /* ── PROGRESS ── */
+    .progress-card{background:white;border-radius:14px;padding:28px 28px 24px;box-shadow:0 2px 12px rgba(0,0,0,0.07);margin-bottom:24px}
+    .progress-card h2{font-size:16px;font-weight:700;color:var(--azul);margin-bottom:16px}
+    .progress-bar-wrap{background:var(--gris3);border-radius:10px;height:12px;overflow:hidden;margin-bottom:10px}
+    .progress-bar{height:100%;border-radius:10px;background:linear-gradient(90deg,var(--azul2),#3182ce);width:0%;transition:width .4s ease}
+    .progress-info{display:flex;justify-content:space-between;font-size:12px;color:var(--gris2)}
+    .paso-actual{margin-top:12px;font-size:13px;color:var(--gris);font-weight:500;min-height:20px}
+    .spinner{display:inline-block;width:12px;height:12px;border:2px solid var(--azul3);border-top-color:var(--azul2);border-radius:50%;animation:spin .7s linear infinite;margin-right:6px}
+    @keyframes spin{to{transform:rotate(360deg)}}
+
+    /* ── RESULTADOS EN TIEMPO REAL ── */
+    .bloques{display:grid;gap:20px}
+    .bloque-card{background:white;border-radius:14px;padding:20px 22px;box-shadow:0 2px 12px rgba(0,0,0,0.06)}
+    .bloque-titulo{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--gris2);border-bottom:2px solid var(--gris3);padding-bottom:8px;margin-bottom:14px}
+    .resultados-lista{display:flex;flex-direction:column;gap:8px}
+    .resultado-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;font-size:13px;animation:fadeIn .3s ease}
+    @keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+    .resultado-item.ok{background:var(--verde2);color:var(--verde);border:1px solid #c6f6d5}
+    .resultado-item.advertencia{background:var(--amarillo2);color:var(--amarillo);border:1px solid #fbd38d}
+    .resultado-item.error{background:var(--rojo2);color:var(--rojo);border:1px solid #fed7d7}
+    .resultado-item.sin_datos{background:var(--gris4);color:var(--gris);border:1px solid var(--gris3)}
+    .resultado-item.pendiente{background:#f0f4f8;color:#a0aec0;border:1px solid #e2e8f0}
+    .result-fuente{font-weight:600;flex:1}
+    .result-msg{font-size:11px;opacity:.8}
+    .result-badge{font-size:10px;font-weight:700;white-space:nowrap}
+
+    /* ── RESUMEN FINAL ── */
+    .resumen-final{background:white;border-radius:14px;padding:24px 28px;box-shadow:0 4px 20px rgba(0,0,0,0.09);margin-top:24px;display:none}
+    .resumen-final h2{font-size:18px;font-weight:800;color:var(--azul);margin-bottom:20px}
+    .contadores{display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:12px;margin-bottom:24px}
+    .contador{text-align:center;padding:16px 10px;border-radius:10px}
+    .contador .num{font-size:32px;font-weight:800;line-height:1}
+    .contador .lbl{font-size:10px;text-transform:uppercase;letter-spacing:.5px;margin-top:4px;opacity:.8}
+    .c-ok{background:var(--verde2);color:var(--verde)}
+    .c-warn{background:var(--amarillo2);color:var(--amarillo)}
+    .c-err{background:var(--rojo2);color:var(--rojo)}
+    .c-nd{background:var(--gris4);color:var(--gris)}
+    .btn-row{display:flex;gap:12px;flex-wrap:wrap}
+    .btn{padding:12px 22px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;border:none;text-decoration:none;display:inline-flex;align-items:center;gap:8px;transition:opacity .2s}
+    .btn:hover{opacity:.88}
+    .btn-primary{background:var(--azul2);color:white}
+    .btn-secondary{background:var(--gris3);color:var(--gris)}
+
+    /* ── CHECKLIST ── */
+    #seccion-checklist{display:none;margin-top:28px}
+    .checklist-card{background:white;border-radius:14px;padding:24px 28px;box-shadow:0 2px 12px rgba(0,0,0,0.06);margin-bottom:20px}
+    .checklist-card h2{font-size:17px;font-weight:800;color:var(--azul);margin-bottom:6px}
+    .checklist-card .subtitulo{font-size:13px;color:var(--gris2);margin-bottom:22px;line-height:1.5}
+    .cat-titulo{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--azul2);border-bottom:2px solid var(--azul3);padding-bottom:6px;margin:20px 0 14px}
+    .cat-titulo:first-of-type{margin-top:0}
+    .check-item{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:start;padding:12px 14px;border-radius:8px;border:1px solid var(--gris3);margin-bottom:8px;transition:border-color .2s}
+    .check-item.critico{border-left:4px solid var(--rojo3)}
+    .check-item:hover{border-color:#a0aec0}
+    .check-nombre{font-size:13px;font-weight:600;color:#2d3748;margin-bottom:3px}
+    .check-detalle{font-size:11px;color:var(--gris2);line-height:1.4}
+    .check-critico-badge{font-size:10px;background:var(--rojo2);color:var(--rojo);padding:2px 6px;border-radius:4px;font-weight:700;white-space:nowrap;margin-top:3px;display:inline-block}
+    .check-opciones{display:flex;flex-direction:column;gap:4px;min-width:110px}
+    .radio-btn{display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;padding:4px 8px;border-radius:6px;border:1px solid var(--gris3);transition:all .2s}
+    .radio-btn:has(input:checked).ok-radio{background:var(--verde2);border-color:var(--verde3);color:var(--verde)}
+    .radio-btn:has(input:checked).fail-radio{background:var(--rojo2);border-color:var(--rojo3);color:var(--rojo)}
+    .radio-btn:has(input:checked).nd-radio{background:var(--gris4);border-color:#a0aec0;color:var(--gris)}
+    .radio-btn input{display:none}
+    .btn-generar{width:100%;padding:16px;background:linear-gradient(135deg,var(--azul),var(--azul2));color:white;border:none;border-radius:10px;font-size:16px;font-weight:800;cursor:pointer;margin-top:20px;transition:opacity .2s}
+    .btn-generar:hover{opacity:.9}
+
+    /* ── RECOMENDACIONES ── */
+    #seccion-recomendaciones{display:none;margin-top:28px}
+    .veredicto-card{border-radius:16px;padding:28px 32px;margin-bottom:20px;border:2px solid}
+    .veredicto-icono{font-size:40px;margin-bottom:12px;display:block}
+    .veredicto-titulo{font-size:24px;font-weight:900;margin-bottom:10px}
+    .veredicto-sub{font-size:14px;opacity:.85}
+    .rec-section{background:white;border-radius:14px;padding:22px 26px;box-shadow:0 2px 12px rgba(0,0,0,0.06);margin-bottom:16px}
+    .rec-section h3{font-size:14px;font-weight:700;margin-bottom:14px}
+    .rec-list{list-style:none;display:flex;flex-direction:column;gap:8px}
+    .rec-list li{display:flex;gap:10px;align-items:flex-start;font-size:13px;line-height:1.5}
+    .rec-list li::before{content:'→';font-weight:700;min-width:16px}
+    .rec-list.rechazo li::before{content:'🚨';color:var(--rojo)}
+    .rec-list.atencion li::before{content:'⚠️'}
+    .rec-list.favor li::before{content:'✅'}
+    .rec-list.recs li::before{content:'💡';color:#d69e2e}
+    .btn-pdf{padding:13px 24px;background:#276749;color:white;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer}
+    .btn-pdf:hover{background:#22543d}
+
+    @media(max-width:640px){
+      .check-item{grid-template-columns:1fr;gap:8px}
+      .check-opciones{flex-direction:row;flex-wrap:wrap}
+    }
+    @media print{
+      .no-print{display:none!important}
+      header{print-color-adjust:exact;-webkit-print-color-adjust:exact}
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>🚗 Verificador Vehicular Perú</h1>
+  <div class="placa-badge">{{ placa }}</div>
+</header>
+
+<main>
+
+  <!-- ── PROGRESO ── -->
+  <div class="progress-card">
+    <h2>Consultando fuentes oficiales...</h2>
+    <div class="progress-bar-wrap">
+      <div class="progress-bar" id="progBar"></div>
+    </div>
+    <div class="progress-info">
+      <span id="pasoLabel">Iniciando...</span>
+      <span id="pctLabel">0%</span>
+    </div>
+    <div class="paso-actual" id="pasoActual">
+      <span class="spinner"></span> Conectando con los portales del Estado peruano...
+    </div>
+  </div>
+
+  <!-- ── RESULTADOS EN TIEMPO REAL ── -->
+  <div class="bloques">
+    <div class="bloque-card">
+      <div class="bloque-titulo">📋 Bloque 1 — Documentación del Vehículo</div>
+      <div class="resultados-lista" id="lista-b1"></div>
+    </div>
+    <div class="bloque-card">
+      <div class="bloque-titulo">🚦 Bloque 2 — Deudas e Infracciones</div>
+      <div class="resultados-lista" id="lista-b2"></div>
+    </div>
+    <div class="bloque-card">
+      <div class="bloque-titulo">📍 Bloque 3 — Papeletas Regionales</div>
+      <div class="resultados-lista" id="lista-b3"></div>
+    </div>
+  </div>
+
+  <!-- ── RESUMEN FINAL ── -->
+  <div class="resumen-final" id="resumenFinal">
+    <h2>✅ Consulta completada</h2>
+    <div class="contadores">
+      <div class="contador c-ok"><div class="num" id="cnt-ok">0</div><div class="lbl">✅ Sin problemas</div></div>
+      <div class="contador c-warn"><div class="num" id="cnt-warn">0</div><div class="lbl">⚠️ Advertencias</div></div>
+      <div class="contador c-err"><div class="num" id="cnt-err">0</div><div class="lbl">🚨 Errores</div></div>
+      <div class="contador c-nd"><div class="num" id="cnt-nd">0</div><div class="lbl">ℹ️ Sin datos</div></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="mostrarChecklist()">🔧 Completar Inspección Técnica</button>
+      <a class="btn btn-secondary" href="/reporte/{{ sid }}" target="_blank">📄 Ver Reporte Completo</a>
+    </div>
+  </div>
+
+  <!-- ── CHECKLIST ── -->
+  <div id="seccion-checklist">
+    <div class="checklist-card">
+      <h2>🔧 Inspección Visual y Técnica</h2>
+      <p class="subtitulo">
+        Completa este checklist mientras inspeccionas físicamente el vehículo.
+        Los ítems marcados con <strong style="color:var(--rojo)">CRÍTICO</strong> son motivo de rechazo inmediato si fallan.
+        Marca "N/R" si no puedes revisar ese punto.
+      </p>
+
+      <form id="formChecklist">
+        {% for cat in categorias %}
+        <div class="cat-titulo">
+          {% if cat == 'exterior' %}🚗 Exterior y Carrocería
+          {% elif cat == 'interior' %}🪑 Interior y Electrónica
+          {% elif cat == 'motor' %}🔧 Motor y Compartimiento
+          {% elif cat == 'chasis' %}⚙️ Chasis y Parte Inferior
+          {% elif cat == 'prueba_manejo' %}🏁 Prueba de Manejo
+          {% endif %}
+        </div>
+
+        {% for item in checklist %}
+        {% if item.categoria == cat %}
+        <div class="check-item {% if item.critico %}critico{% endif %}">
+          <div style="padding-top:2px">
+            <div style="font-size:12px;color:var(--gris2);font-weight:700">{{ item.id }}</div>
+          </div>
+          <div>
+            <div class="check-nombre">{{ item.item }}</div>
+            <div class="check-detalle">{{ item.detalle }}</div>
+            {% if item.critico %}<span class="check-critico-badge">⚠️ CRÍTICO</span>{% endif %}
+          </div>
+          <div class="check-opciones">
+            <label class="radio-btn ok-radio">
+              <input type="radio" name="{{ item.id }}" value="ok"> ✅ OK
+            </label>
+            <label class="radio-btn fail-radio">
+              <input type="radio" name="{{ item.id }}" value="falla"> ❌ Falla
+            </label>
+            <label class="radio-btn nd-radio">
+              <input type="radio" name="{{ item.id }}" value="no_revisado" checked> — N/R
+            </label>
+          </div>
+        </div>
+        {% endif %}
+        {% endfor %}
+        {% endfor %}
+
+        <button type="button" class="btn-generar" onclick="generarRecomendaciones()">
+          ✅ Generar Veredicto y Recomendaciones
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ── RECOMENDACIONES ── -->
+  <div id="seccion-recomendaciones">
+    <div class="veredicto-card" id="veredictoCard">
+      <span class="veredicto-icono" id="veredictoIcono"></span>
+      <div class="veredicto-titulo" id="veredictoTitulo"></div>
+      <div class="veredicto-sub" id="veredictoSub"></div>
+    </div>
+
+    <div class="rec-section" id="secRechazo" style="display:none">
+      <h3 style="color:var(--rojo)">🚨 Razones para NO comprar</h3>
+      <ul class="rec-list rechazo" id="listaRechazo"></ul>
+    </div>
+
+    <div class="rec-section" id="secAtencion" style="display:none">
+      <h3 style="color:var(--amarillo)">⚠️ Puntos a atender o negociar</h3>
+      <ul class="rec-list atencion" id="listaAtencion"></ul>
+    </div>
+
+    <div class="rec-section" id="secFavor" style="display:none">
+      <h3 style="color:var(--verde)">✅ Puntos a favor</h3>
+      <ul class="rec-list favor" id="listaFavor"></ul>
+    </div>
+
+    <div class="rec-section">
+      <h3 style="color:#d69e2e">💡 Recomendaciones de acción</h3>
+      <ul class="rec-list recs" id="listaRecs"></ul>
+    </div>
+
+    <div class="btn-row no-print" style="margin-top:16px">
+      <button class="btn-pdf" onclick="window.print()">🖨️ Exportar PDF</button>
+      <a class="btn btn-secondary" href="/reporte/{{ sid }}" target="_blank">📄 Reporte completo</a>
+      <a class="btn btn-secondary" href="/">🔄 Nueva consulta</a>
+    </div>
+  </div>
+
+</main>
+
+<script>
+const SID = "{{ sid }}";
+const PLACA = "{{ placa }}";
+const iconos = {ok:"✅",advertencia:"⚠️",error:"🚨",sin_datos:"ℹ️"};
+const labels = {ok:"OK",advertencia:"ADVERTENCIA",error:"ERROR",sin_datos:"SIN DATOS"};
+let escaneoTerminado = false;
+
+// ── SSE ────────────────────────────────────────────────────────────────────────
+const es = new EventSource("/api/stream/" + SID);
+
+es.onmessage = function(e) {
+  const ev = JSON.parse(e.data);
+
+  if (ev.tipo === "progreso") {
+    document.getElementById("progBar").style.width = ev.pct + "%";
+    document.getElementById("pctLabel").textContent = ev.pct + "%";
+    document.getElementById("pasoLabel").textContent = "Paso " + ev.paso + " de " + ev.total;
+    document.getElementById("pasoActual").innerHTML =
+      '<span class="spinner"></span> Consultando: <strong>' + ev.nombre + '</strong>';
+  }
+
+  else if (ev.tipo === "resultado") {
+    const r  = ev.resultado;
+    const el = document.createElement("div");
+    el.className = "resultado-item " + r.estado;
+    const msg = r.mensaje ? '<span class="result-msg"> — ' + r.mensaje.substring(0,80) + '</span>' : '';
+    el.innerHTML =
+      '<span>' + iconos[r.estado] + '</span>' +
+      '<span class="result-fuente">' + r.fuente + msg + '</span>' +
+      '<span class="result-badge">' + labels[r.estado] + '</span>';
+    document.getElementById("lista-b" + ev.bloque).appendChild(el);
+  }
+
+  else if (ev.tipo === "listo") {
+    document.getElementById("progBar").style.width = "100%";
+    document.getElementById("pctLabel").textContent = "100%";
+    document.getElementById("pasoActual").textContent = "✅ Consulta completada.";
+    document.getElementById("cnt-ok").textContent   = ev.ok;
+    document.getElementById("cnt-warn").textContent = ev.warn;
+    document.getElementById("cnt-err").textContent  = ev.errors;
+    document.getElementById("cnt-nd").textContent   = ev.total - ev.ok - ev.warn - ev.errors;
+    document.getElementById("resumenFinal").style.display = "block";
+    escaneoTerminado = true;
+    es.close();
+  }
+
+  else if (ev.tipo === "error_fatal") {
+    document.getElementById("pasoActual").innerHTML =
+      '<span style="color:var(--rojo)">🚨 Error: ' + ev.mensaje + '</span>';
+    es.close();
+  }
+
+  else if (ev.tipo === "fin") {
+    es.close();
+  }
+};
+
+es.onerror = function() {
+  if (!escaneoTerminado) {
+    document.getElementById("pasoActual").innerHTML =
+      '<span style="color:var(--rojo)">⚠️ Conexión interrumpida. Recarga la página para reintentar.</span>';
+  }
+  es.close();
+};
+
+// ── Mostrar checklist ─────────────────────────────────────────────────────────
+function mostrarChecklist() {
+  document.getElementById("seccion-checklist").style.display = "block";
+  document.getElementById("seccion-checklist").scrollIntoView({behavior:"smooth"});
+}
+
+// ── Generar recomendaciones ───────────────────────────────────────────────────
+async function generarRecomendaciones() {
+  const form  = document.getElementById("formChecklist");
+  const rads  = form.querySelectorAll("input[type='radio']:checked");
+  const resp  = {};
+  rads.forEach(r => { resp[r.name] = r.value; });
+
+  const res = await fetch("/api/recomendaciones", {
+    method : "POST",
+    headers: {"Content-Type":"application/json"},
+    body   : JSON.stringify({sid: SID, respuestas: resp}),
+  });
+  const data = await res.json();
+  mostrarVeredicto(data);
+}
+
+function mostrarVeredicto(d) {
+  // Card veredicto
+  const card = document.getElementById("veredictoCard");
+  card.style.background = d.bg;
+  card.style.borderColor = d.border;
+  card.style.color = d.color;
+  document.getElementById("veredictoIcono").textContent  = d.icono;
+  document.getElementById("veredictoTitulo").textContent = d.etiqueta;
+  document.getElementById("veredictoSub").textContent =
+    "Puntuación: " + d.puntos_negativos + " puntos negativos / " + d.puntos_positivos + " positivos";
+
+  // Razones rechazo
+  if (d.razones_rechazo && d.razones_rechazo.length) {
+    llenarLista("listaRechazo", d.razones_rechazo);
+    document.getElementById("secRechazo").style.display = "block";
+  }
+  // Razones atención
+  if (d.razones_atencion && d.razones_atencion.length) {
+    llenarLista("listaAtencion", d.razones_atencion);
+    document.getElementById("secAtencion").style.display = "block";
+  }
+  // Puntos favor
+  if (d.puntos_favor && d.puntos_favor.length) {
+    llenarLista("listaFavor", d.puntos_favor);
+    document.getElementById("secFavor").style.display = "block";
+  }
+  // Recomendaciones
+  llenarLista("listaRecs", d.recomendaciones);
+
+  document.getElementById("seccion-recomendaciones").style.display = "block";
+  document.getElementById("seccion-recomendaciones").scrollIntoView({behavior:"smooth"});
+}
+
+function llenarLista(id, items) {
+  const ul = document.getElementById(id);
+  ul.innerHTML = "";
+  items.forEach(txt => {
+    const li = document.createElement("li");
+    li.textContent = txt;
+    ul.appendChild(li);
+  });
+}
+</script>
+</body>
+</html>
