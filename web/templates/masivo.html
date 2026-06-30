@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Verificación Masiva — {{ total }} placas</title>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --azul:#1a365d;--azul2:#2b6cb0;--azul3:#ebf4ff;
+      --verde:#276749;--verde2:#f0fff4;--verde3:#68d391;
+      --amarillo:#744210;--amarillo2:#fffbeb;--amarillo3:#f6ad55;
+      --rojo:#742a2a;--rojo2:#fff5f5;--rojo3:#fc8181;
+      --gris:#4a5568;--gris2:#718096;--gris3:#e2e8f0;--gris4:#f7fafc;
+    }
+    body{font-family:'Segoe UI',Arial,sans-serif;background:var(--gris4);color:#1a202c;min-height:100vh}
+
+    header{background:linear-gradient(135deg,var(--azul),var(--azul2));color:white;padding:18px 28px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+    header h1{font-size:17px;font-weight:700}
+    .badge-total{background:rgba(255,255,255,0.15);border:2px solid rgba(255,255,255,0.35);border-radius:8px;padding:6px 18px;font-size:15px;font-weight:700}
+
+    main{max-width:1000px;margin:28px auto;padding:0 16px 80px}
+
+    /* Barra de progreso global */
+    .prog-card{background:white;border-radius:14px;padding:24px 28px;box-shadow:0 2px 12px rgba(0,0,0,0.07);margin-bottom:24px}
+    .prog-card h2{font-size:16px;font-weight:700;color:var(--azul);margin-bottom:14px}
+    .bar-wrap{background:var(--gris3);border-radius:10px;height:14px;overflow:hidden;margin-bottom:10px}
+    .bar{height:100%;border-radius:10px;background:linear-gradient(90deg,var(--azul2),#3182ce);width:0%;transition:width .5s ease}
+    .prog-info{display:flex;justify-content:space-between;font-size:12px;color:var(--gris2)}
+    .estado-texto{margin-top:10px;font-size:13px;color:var(--gris);min-height:20px}
+    .spinner{display:inline-block;width:11px;height:11px;border:2px solid var(--azul3);border-top-color:var(--azul2);border-radius:50%;animation:spin .7s linear infinite;margin-right:5px}
+    @keyframes spin{to{transform:rotate(360deg)}}
+
+    /* Contadores de resumen */
+    .contadores{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:12px;margin-bottom:24px}
+    .contador{background:white;border-radius:10px;padding:14px 10px;text-align:center;box-shadow:0 1px 6px rgba(0,0,0,0.06)}
+    .contador .num{font-size:28px;font-weight:800;line-height:1}
+    .contador .lbl{font-size:10px;text-transform:uppercase;letter-spacing:.5px;margin-top:4px;color:var(--gris2)}
+    .c-ok .num{color:var(--verde)} .c-warn .num{color:var(--amarillo)}
+    .c-err .num{color:var(--rojo)} .c-proc .num{color:var(--azul2)}
+
+    /* Tabla de resultados */
+    .tabla-card{background:white;border-radius:14px;padding:22px 24px;box-shadow:0 2px 12px rgba(0,0,0,0.06)}
+    .tabla-card h2{font-size:15px;font-weight:700;color:var(--azul);margin-bottom:16px}
+    table{width:100%;border-collapse:collapse;font-size:13px}
+    thead th{background:var(--azul);color:white;padding:9px 12px;text-align:left;font-weight:600;font-size:12px}
+    tbody tr{border-bottom:1px solid var(--gris3);transition:background .15s}
+    tbody tr:hover{background:var(--azul3)}
+    tbody td{padding:10px 12px;vertical-align:middle}
+    .placa-cell{font-weight:800;letter-spacing:2px;font-size:14px}
+    .estado-chip{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;white-space:nowrap}
+    .chip-ok{background:var(--verde2);color:var(--verde);border:1px solid #c6f6d5}
+    .chip-warn{background:var(--amarillo2);color:var(--amarillo);border:1px solid #fbd38d}
+    .chip-err{background:var(--rojo2);color:var(--rojo);border:1px solid #fed7d7}
+    .chip-proc{background:var(--azul3);color:var(--azul2);border:1px solid #bee3f8}
+    .chip-pend{background:var(--gris4);color:var(--gris2);border:1px solid var(--gris3)}
+    .btn-reporte{background:var(--azul2);color:white;border:none;padding:5px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;text-decoration:none;display:inline-block}
+    .btn-reporte:hover{background:var(--azul)}
+    .btn-reporte.disabled{background:var(--gris3);color:var(--gris2);cursor:not-allowed;pointer-events:none}
+
+    /* Botones de accion */
+    .acciones{display:flex;gap:12px;margin-top:20px;flex-wrap:wrap}
+    .btn{padding:11px 20px;border-radius:9px;font-size:13px;font-weight:700;cursor:pointer;border:none;text-decoration:none;display:inline-flex;align-items:center;gap:7px;transition:opacity .2s}
+    .btn:hover{opacity:.88}
+    .btn-primary{background:var(--azul2);color:white}
+    .btn-secondary{background:var(--gris3);color:var(--gris)}
+    .btn-excel{background:#276749;color:white}
+
+    @media(max-width:640px){table{font-size:11px} thead th,tbody td{padding:7px 8px}}
+    @media print{.no-print{display:none!important}}
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>📋 Verificación Masiva — Verificador Vehicular Perú</h1>
+  <div class="badge-total">{{ total }} placas en lote</div>
+</header>
+
+<main>
+
+  <!-- Progreso global -->
+  <div class="prog-card">
+    <h2>Progreso del lote</h2>
+    <div class="bar-wrap"><div class="bar" id="barGlobal"></div></div>
+    <div class="prog-info">
+      <span id="labelPaso">Iniciando...</span>
+      <span id="labelPct">0%</span>
+    </div>
+    <div class="estado-texto" id="estadoTexto">
+      <span class="spinner"></span> Preparando el lote de {{ total }} placas...
+    </div>
+  </div>
+
+  <!-- Contadores -->
+  <div class="contadores">
+    <div class="contador c-proc">
+      <div class="num" id="cntProc">0</div>
+      <div class="lbl">⏳ Procesadas</div>
+    </div>
+    <div class="contador c-ok">
+      <div class="num" id="cntOk">0</div>
+      <div class="lbl">✅ Sin problemas</div>
+    </div>
+    <div class="contador c-warn">
+      <div class="num" id="cntWarn">0</div>
+      <div class="lbl">⚠️ Con alertas</div>
+    </div>
+    <div class="contador c-err">
+      <div class="num" id="cntErr">0</div>
+      <div class="lbl">🚨 Con errores</div>
+    </div>
+  </div>
+
+  <!-- Tabla de resultados -->
+  <div class="tabla-card">
+    <h2>Resultados por placa</h2>
+    <table id="tablaResultados">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Placa</th>
+          <th>Estado</th>
+          <th>Sin probl.</th>
+          <th>Alertas</th>
+          <th>Errores</th>
+          <th>Reporte</th>
+        </tr>
+      </thead>
+      <tbody id="cuerpoTabla">
+        {% for placa in placas %}
+        <tr id="fila-{{ placa }}">
+          <td>{{ loop.index }}</td>
+          <td class="placa-cell">{{ placa }}</td>
+          <td><span class="estado-chip chip-pend">⏸ Pendiente</span></td>
+          <td>—</td>
+          <td>—</td>
+          <td>—</td>
+          <td><a class="btn-reporte disabled">— </a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <div class="acciones no-print">
+      <button class="btn btn-excel" id="btnExportar" onclick="exportarCSV()" disabled>
+        📊 Exportar a CSV
+      </button>
+      <button class="btn btn-primary" onclick="window.print()">🖨️ Imprimir</button>
+      <a class="btn btn-secondary" href="/">🔄 Nueva consulta</a>
+    </div>
+  </div>
+
+</main>
+
+<script>
+const BID   = "{{ bid }}";
+const TOTAL = {{ total }};
+let procesadas = 0, sinProbl = 0, alertas = 0, errores = 0;
+let loteTerminado = false;
+const resultadosFinales = [];
+
+const es = new EventSource("/api/masivo/stream/" + BID);
+
+es.onmessage = function(e) {
+  const ev = JSON.parse(e.data);
+
+  if (ev.tipo === "iniciando") {
+    const pct = Math.round((ev.num - 1) / TOTAL * 100);
+    document.getElementById("barGlobal").style.width = pct + "%";
+    document.getElementById("labelPct").textContent  = pct + "%";
+    document.getElementById("labelPaso").textContent =
+      "Placa " + ev.num + " de " + ev.total;
+    document.getElementById("estadoTexto").innerHTML =
+      '<span class="spinner"></span> Verificando: <strong>' + ev.placa + '</strong>';
+
+    // Marcar fila como en proceso
+    actualizarFila(ev.placa, "proceso", null);
+  }
+
+  else if (ev.tipo === "placa_lista") {
+    const r = ev.resumen;
+    procesadas++;
+    document.getElementById("cntProc").textContent = procesadas;
+
+    let estado;
+    if (r.error_msg) {
+      estado = "error";
+      errores++;
+    } else if (r.advertencia > 0) {
+      estado = "advertencia";
+      alertas++;
+    } else if (r.error > 0) {
+      estado = "error";
+      errores++;
+    } else {
+      estado = "ok";
+      sinProbl++;
+    }
+
+    document.getElementById("cntOk").textContent   = sinProbl;
+    document.getElementById("cntWarn").textContent  = alertas;
+    document.getElementById("cntErr").textContent   = errores;
+
+    actualizarFila(r.placa, estado, r);
+    resultadosFinales.push({placa: r.placa, estado, ...r});
+  }
+
+  else if (ev.tipo === "lote_listo") {
+    document.getElementById("barGlobal").style.width = "100%";
+    document.getElementById("labelPct").textContent  = "100%";
+    document.getElementById("labelPaso").textContent = "Lote completado";
+    document.getElementById("estadoTexto").textContent =
+      "✅ Todas las placas han sido verificadas.";
+    document.getElementById("btnExportar").disabled = false;
+    loteTerminado = true;
+    es.close();
+  }
+
+  else if (ev.tipo === "fin") { es.close(); }
+};
+
+es.onerror = function() {
+  if (!loteTerminado) {
+    document.getElementById("estadoTexto").innerHTML =
+      '<span style="color:var(--rojo)">⚠️ Conexión interrumpida. Recarga para reintentar.</span>';
+  }
+  es.close();
+};
+
+function actualizarFila(placa, estado, r) {
+  const fila = document.getElementById("fila-" + placa);
+  if (!fila) return;
+
+  const chips = {
+    ok        : '<span class="estado-chip chip-ok">✅ Sin problemas</span>',
+    advertencia: '<span class="estado-chip chip-warn">⚠️ Con alertas</span>',
+    error     : '<span class="estado-chip chip-err">🚨 Errores</span>',
+    proceso   : '<span class="estado-chip chip-proc"><span class="spinner"></span>Procesando</span>',
+  };
+
+  const celdas = fila.querySelectorAll("td");
+  celdas[2].innerHTML = chips[estado] || chips["proceso"];
+
+  if (r && estado !== "proceso") {
+    celdas[3].textContent = r.ok        !== undefined ? r.ok         : "—";
+    celdas[4].textContent = r.advertencia !== undefined ? r.advertencia : "—";
+    celdas[5].textContent = r.error     !== undefined ? r.error      : "—";
+    if (r.sid) {
+      celdas[6].innerHTML =
+        '<a class="btn-reporte" href="/reporte/' + r.sid + '" target="_blank">Ver reporte</a>';
+    }
+  }
+}
+
+function exportarCSV() {
+  const filas = [["#","Placa","Estado","Sin_problemas","Alertas","Errores","URL_Reporte"]];
+  resultadosFinales.forEach((r, i) => {
+    const url = r.sid ? window.location.origin + "/reporte/" + r.sid : "";
+    filas.push([i+1, r.placa, r.estado, r.ok||0, r.advertencia||0, r.error||0, url]);
+  });
+  const csv = filas.map(f => f.join(",")).join("\n");
+  const blob = new Blob(["﻿" + csv], {type:"text/csv;charset=utf-8"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "verificacion_masiva_" + new Date().toISOString().slice(0,10) + ".csv";
+  a.click();
+}
+</script>
+</body>
+</html>
