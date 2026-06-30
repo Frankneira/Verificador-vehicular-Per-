@@ -5,45 +5,30 @@
 
 FROM python:3.11-slim
 
-# ── Dependencias del sistema para Chromium / Playwright ──────────────────────────────────
+# Herramientas base minimas
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libnss3 libnspr4 \
-    libatk1.0-0 libatk-bridge2.0-0 \
-    libcups2 libdrm2 \
-    libxkbcommon0 libxcomposite1 libxdamage1 \
-    libxrandr2 libgbm1 libasound2 \
-    libpango-1.0-0 libpangocairo-1.0-0 \
-    libcairo2 libxshmfence1 \
-    fonts-liberation fonts-noto-color-emoji \
     ca-certificates curl \
     && rm -rf /var/lib/apt/lists/*
 
-# ── Directorio de trabajo ──────────────────────────────────────────────────────────────
 WORKDIR /app
 
-# ── Instalar dependencias Python ──────────────────────────────────────────────
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# ── Instalar Chromium via Playwright ─────────────────────────────────────────
-RUN playwright install chromium
+# Instalar Chromium con TODAS sus dependencias del sistema (forma correcta para Docker)
+RUN playwright install --with-deps chromium
 
-# ── Copiar codigo fuente ──────────────────────────────────────────────────────
 COPY . .
 
-# ── Crear carpeta de reportes ───────────────────────────────────────────────────
 RUN mkdir -p reportes
 
-# ── Variables de entorno ─────────────────────────────────────────────────────────────
 ENV HEADLESS=true
 ENV TIMEOUT=30
 ENV PORT=8000
 ENV PYTHONPATH=/app
 
-# ── Puerto expuesto ────────────────────────────────────────────────────────────────
 EXPOSE 8000
 
-# ── Servidor de produccion ────────────────────────────────────────────────────────
 CMD gunicorn app:app \
     --bind 0.0.0.0:$PORT \
     --workers 1 \
