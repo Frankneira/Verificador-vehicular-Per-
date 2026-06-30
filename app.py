@@ -172,10 +172,10 @@ async def _scraping_async(sid, placa, cola):
                     "--disable-dev-shm-usage",
                     "--disable-gpu",
                     "--no-zygote",
-                    "--single-process",
                     "--disable-extensions",
                     "--no-first-run",
                     "--disable-accelerated-2d-canvas",
+                    "--disable-software-rasterizer",
                 ]
             )
             context = await browser.new_context(
