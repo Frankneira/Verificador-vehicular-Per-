@@ -1,12 +1,26 @@
-[build]
-  builder = "DOCKERFILE"
-  dockerfilePath = "Dockerfile"
-
-[deploy]
-  numReplicas = 1
-  sleepApplication = false
-  restartPolicyType = "ON_FAILURE"
-  restartPolicyMaxRetries = 3
-
-[[services]]
-  name = "verificador-vehicular-peru"
+services:
+  - type: web
+    name: verificador-vehicular-peru
+    env: docker
+    dockerfilePath: ./Dockerfile
+    plan: starter
+    region: oregon
+    envVars:
+      - key: HEADLESS
+        value: "true"
+      - key: TIMEOUT
+        value: "30"
+      - key: PORT
+        value: "8000"
+      - key: SECRET_KEY
+        generateValue: true
+      - key: SUNARP_SPRL_USUARIO
+        sync: false
+      - key: SUNARP_SPRL_CLAVE
+        sync: false
+      - key: TRUJILLO_DNI
+        sync: false
+      - key: TRUJILLO_CELULAR
+        sync: false
+      - key: TRUJILLO_CORREO
+        sync: false
