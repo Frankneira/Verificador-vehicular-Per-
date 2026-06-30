@@ -166,7 +166,17 @@ async def _scraping_async(sid, placa, cola):
         async with async_playwright() as pw:
             browser = await pw.chromium.launch(
                 headless=HEADLESS,
-                args=["--no-sandbox", "--disable-dev-shm-usage", "--start-maximized"]
+                args=[
+                    "--no-sandbox",
+                    "--disable-setuid-sandbox",
+                    "--disable-dev-shm-usage",
+                    "--disable-gpu",
+                    "--no-zygote",
+                    "--single-process",
+                    "--disable-extensions",
+                    "--no-first-run",
+                    "--disable-accelerated-2d-canvas",
+                ]
             )
             context = await browser.new_context(
                 viewport={"width": 1280, "height": 800},
